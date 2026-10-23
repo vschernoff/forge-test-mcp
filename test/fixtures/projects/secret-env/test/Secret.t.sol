@@ -20,4 +20,12 @@ contract SecretTest is Test {
         console.log("pk", pk);
         revert(vm.toString(pk));
     }
+
+    /// An RPC URL with an API key in its path (D24). forge masks it in its own fork errors and
+    /// traces ("<rpc url>"), but not when a test prints it.
+    function test_leaksRpcUrl() public view {
+        string memory url = vm.envString("MAINNET_RPC_URL");
+        console.log("rpc", url);
+        revert(string.concat("cannot reach ", url));
+    }
 }

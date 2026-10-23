@@ -220,4 +220,9 @@ test('values of secret-named .env variables are redacted (D19 Q6)', { skip }, as
   const asNumber = failure(payload, 'SecretTest.test_leaksDotenvAsNumber()')
   assert.equal(asNumber.reason, '[redacted:DEPLOYER_PRIVATE_KEY]')
   assert.deepEqual(asNumber.logs, ['pk [redacted:DEPLOYER_PRIVATE_KEY]'])
+  // D24: an RPC URL with an API key in it, printed by the test.
+  assert.ok(!text.includes('dummyrpcapikey123456'), 'RPC URL leaked')
+  const rpc = failure(payload, 'SecretTest.test_leaksRpcUrl()')
+  assert.equal(rpc.reason, 'cannot reach [redacted:MAINNET_RPC_URL]')
+  assert.deepEqual(rpc.logs, ['rpc [redacted:MAINNET_RPC_URL]'])
 })

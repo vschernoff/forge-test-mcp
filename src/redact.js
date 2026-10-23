@@ -1,10 +1,11 @@
 const fs = require('node:fs')
 const path = require('node:path')
 
-// D19 Q6: redact the exact values of secret-named variables, from the server's environment and
-// the project's .env (forge loads .env itself, so tests can print those values). Matching by
-// shape instead would blank every bytes32, hash and calldata word the agent needs.
-const SECRET_NAME = /PRIVATE_KEY|MNEMONIC|SECRET|TOKEN|API_KEY/i
+// D19 Q6 and D24: redact the exact values of secret-named variables, from the server's
+// environment and the project's .env (forge loads .env itself, so tests can print those values).
+// RPC URLs are included because they often embed an API key. Matching by shape instead would
+// blank every bytes32, hash and calldata word the agent needs.
+const SECRET_NAME = /PRIVATE_KEY|MNEMONIC|SECRET|TOKEN|API_KEY|RPC_URL/i
 // Shorter values ("1", "true") would redact ordinary output and protect nothing.
 const MIN_LENGTH = 8
 

@@ -29,6 +29,18 @@ test('redacts exact values of secret-named variables from env and .env (D19 Q6)'
   })
 })
 
+test('RPC URLs are redacted, since they often carry an API key (D24)', () => {
+  const url = 'https://eth-mainnet.example.com/v2/abcDEF123456apikey'
+  const secrets = collectSecrets({
+    env: {},
+    root: project(`MAINNET_RPC_URL=${url}\nSEPOLIA_RPC_URL="${url}-sepolia"\n`),
+  })
+  assert.equal(
+    redact(`vm.createSelectFork: ${url}-sepolia failed; fallback ${url}`, secrets),
+    'vm.createSelectFork: [redacted:SEPOLIA_RPC_URL] failed; fallback [redacted:MAINNET_RPC_URL]'
+  )
+})
+
 test('a hex key is found with or without 0x and in any case', () => {
   const secrets = collectSecrets({ env: { DEPLOYER_PRIVATE_KEY: KEY }, root: project() })
   const bare = KEY.slice(2)
@@ -61,7 +73,7 @@ test('does not redact by shape: other bytes32 values survive', () => {
 
 test('ignores non-secret names and values too short to matter', () => {
   const secrets = collectSecrets({
-    env: { RPC_URL: 'http://localhost:8545', SECRET_FLAG: 'true', API_KEY: '1234567' },
+    env: { FOUNDRY_PROFILE: 'production-profile', SECRET_FLAG: 'true', API_KEY: '1234567' },
     root: project(),
   })
   assert.deepEqual(secrets, [])
