@@ -1,0 +1,59 @@
+Compiling 21 files with Solc 0.8.37
+Solc 0.8.37 finished in 436.40ms
+Compiler run successful!
+
+Ran 2 tests for test/Supply.t.sol:SupplyInvariantTest
+[FAIL: supply mismatch: 6683 != 6355]
+	[Sequence] (original: 4, shrunk: 2)
+		sender=0x000000000000000000000000000000000000022f addr=[test/Supply.t.sol:Handler]0x2e234DAe75C793f67A35089C9d99245E1C58470b calldata=mint(uint256) args=[6683]
+		sender=0x000000000000000000000000000000000000054E addr=[test/Supply.t.sol:Handler]0x2e234DAe75C793f67A35089C9d99245E1C58470b calldata=burnFrom(uint256) args=[328]
+ invariant_supplyMatches() (runs: 1, calls: 4, reverts: 0)
+
+╭----------+----------+-------+---------+----------╮
+| Contract | Selector | Calls | Reverts | Discards |
++==================================================+
+| Handler  | burnFrom | 3     | 0       | 0        |
+|----------+----------+-------+---------+----------|
+| Handler  | mint     | 1     | 0       | 0        |
+╰----------+----------+-------+---------+----------╯
+
+Traces:
+  [70663] Handler::mint(6683)
+    ├─ [66912] Supply::mint(Handler: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], 6683)
+    │   └─ ← [Stop]
+    └─ ← [Stop]
+
+  [37534] Handler::burnFrom(328)
+    ├─ [2824] Supply::balanceOf(Handler: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   └─ ← [Return] 6683
+    ├─ [27760] Supply::burnFrom(Handler: [0x2e234DAe75C793f67A35089C9d99245E1C58470b], 328)
+    │   └─ ← [Stop]
+    └─ ← [Stop]
+
+  [21670] SupplyInvariantTest::invariant_supplyMatches()
+    ├─ [2402] Supply::totalSupply() [staticcall]
+    │   └─ ← [Return] 6683
+    ├─ [2824] Supply::balanceOf(Handler: [0x2e234DAe75C793f67A35089C9d99245E1C58470b]) [staticcall]
+    │   └─ ← [Return] 6355
+    ├─ [0] VM::assertEq(6683, 6355, "supply mismatch") [staticcall]
+    │   └─ ← [Revert] supply mismatch: 6683 != 6355
+    └─ ← [Revert] supply mismatch: 6683 != 6355
+
+[PASS] test_mintUpdatesSupply() (gas: 80907)
+Suite result: FAILED. 1 passed; 1 failed; 0 skipped; finished in 102.76ms (102.13ms CPU time)
+
+Ran 1 test suite in 106.10ms (102.76ms CPU time): 1 tests passed, 1 failed, 0 skipped (2 total tests)
+
+Failing tests:
+Encountered 1 failing test in test/Supply.t.sol:SupplyInvariantTest
+[FAIL: supply mismatch: 6683 != 6355]
+	[Sequence] (original: 4, shrunk: 2)
+		sender=0x000000000000000000000000000000000000022f addr=[test/Supply.t.sol:Handler]0x2e234DAe75C793f67A35089C9d99245E1C58470b calldata=mint(uint256) args=[6683]
+		sender=0x000000000000000000000000000000000000054E addr=[test/Supply.t.sol:Handler]0x2e234DAe75C793f67A35089C9d99245E1C58470b calldata=burnFrom(uint256) args=[328]
+ invariant_supplyMatches() (runs: 1, calls: 4, reverts: 0)
+
+Encountered a total of 1 failing tests, 1 tests succeeded
+
+Tip: Run `forge test --rerun` to retry only the 1 failed test
+
+Fuzz seed: 0x5eed (use `--fuzz-seed` to reproduce)

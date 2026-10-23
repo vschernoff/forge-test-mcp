@@ -1,0 +1,112 @@
+Compiling 21 files with Solc 0.8.37
+Solc 0.8.37 finished in 495.00ms
+Compiler run successful!
+
+Ran 1 test for test/Edge.t.sol:SetUpFailsTest
+[FAIL: setUp exploded] setUp() (gas: 0)
+Suite result: FAILED. 0 passed; 1 failed; 0 skipped; finished in 322.88µs (0.00ns CPU time)
+
+Ran 5 tests for test/Edge.t.sol:EdgeTest
+[FAIL: deep failure: 1 != 2] test_deepTrace() (gas: 381330)
+Traces:
+  [381330] EdgeTest::test_deepTrace()
+    ├─ [43482] Counter::increment()
+    │   └─ ← [Stop]
+    ├─ [26382] Counter::increment()
+    │   └─ ← [Stop]
+    ├─ [26382] Counter::increment()
+    │   └─ ← [Stop]
+    ├─ [26382] Counter::increment()
+    │   └─ ← [Stop]
+    ├─ [26382] Counter::increment()
+    │   └─ ← [Stop]
+    ├─ [26382] Counter::increment()
+    │   └─ ← [Stop]
+    ├─ [26382] Counter::increment()
+    │   └─ ← [Stop]
+    ├─ [26382] Counter::increment()
+    │   └─ ← [Stop]
+    ├─ [26382] Counter::increment()
+    │   └─ ← [Stop]
+    ├─ [26382] Counter::increment()
+    │   └─ ← [Stop]
+    ├─ [26382] Counter::increment()
+    │   └─ ← [Stop]
+    ├─ [26382] Counter::increment()
+    │   └─ ← [Stop]
+    ├─ [26596] Counter::setNumber(1)
+    │   └─ ← [Stop]
+    ├─ [2424] Counter::number() [staticcall]
+    │   └─ ← [Return] 1
+    ├─ [0] VM::assertEq(1, 2, "deep failure") [staticcall]
+    │   └─ ← [Revert] deep failure: 1 != 2
+    └─ ← [Revert] deep failure: 1 != 2
+
+Backtrace:
+  at VM.assertEq
+  at EdgeTest.test_deepTrace
+
+[FAIL: vm.createSelectFork: invalid rpc url: mainnet] test_forkWithoutRpc() (gas: 3201)
+Traces:
+  [3201] EdgeTest::test_forkWithoutRpc()
+    ├─ [0] VM::createSelectFork("mainnet")
+    │   └─ ← [Revert] vm.createSelectFork: invalid rpc url: mainnet
+    └─ ← [Revert] vm.createSelectFork: invalid rpc url: mainnet
+
+Backtrace:
+  at VM.createSelectFork
+  at EdgeTest.test_forkWithoutRpc
+
+[FAIL: ] test_hugeRevertString() (gas: 2410)
+Traces:
+  [2410] EdgeTest::test_hugeRevertString()
+    └─ ← [Revert] 
+
+Backtrace:
+  at EdgeTest.test_hugeRevertString
+
+[FAIL: assertion failed: 0 != 7] test_logsThenFails() (gas: 24241)
+Logs:
+  about to fail, number = 0
+  custom log: 42
+
+Traces:
+  [24241] EdgeTest::test_logsThenFails()
+    ├─ [2424] Counter::number() [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [0] console::log("about to fail, number =", 0) [staticcall]
+    │   └─ ← [Stop]
+    ├─ emit log_named_uint(key: "custom log", val: 42)
+    ├─ [2424] Counter::number() [staticcall]
+    │   └─ ← [Return] 0
+    ├─ [0] VM::assertEq(0, 7) [staticcall]
+    │   └─ ← [Revert] assertion failed: 0 != 7
+    └─ ← [Revert] assertion failed: 0 != 7
+
+Backtrace:
+  at VM.assertEq
+  at EdgeTest.test_logsThenFails
+
+[SKIP] test_skipped() (gas: 0)
+Suite result: FAILED. 0 passed; 4 failed; 1 skipped; finished in 18.06ms (3.35ms CPU time)
+
+Ran 1 test for test/Edge.t.sol:EdgeFuzzRejectTest
+[PASS] testFuzz_tooManyRejects(uint256) (runs: 256, μ: 3511, ~: 3511)
+Suite result: ok. 1 passed; 0 failed; 0 skipped; finished in 18.26ms (17.86ms CPU time)
+
+Ran 3 test suites in 21.40ms (36.64ms CPU time): 1 tests passed, 5 failed, 1 skipped (7 total tests)
+
+Failing tests:
+Encountered 4 failing tests in test/Edge.t.sol:EdgeTest
+[FAIL: deep failure: 1 != 2] test_deepTrace() (gas: 381330)
+[FAIL: vm.createSelectFork: invalid rpc url: mainnet] test_forkWithoutRpc() (gas: 3201)
+[FAIL: ] test_hugeRevertString() (gas: 2410)
+[FAIL: assertion failed: 0 != 7] test_logsThenFails() (gas: 24241)
+
+Encountered 1 failing test in test/Edge.t.sol:SetUpFailsTest
+[FAIL: setUp exploded] setUp() (gas: 0)
+
+Encountered a total of 5 failing tests, 1 tests succeeded
+
+Tip: Run `forge test --rerun` to retry only the 5 failed tests
+Tip: Run `forge test --debug --match-test <TEST_NAME>` to inspect one failing test in the debugger

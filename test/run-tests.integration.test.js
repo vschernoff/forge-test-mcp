@@ -187,7 +187,9 @@ test(
     const t = small.payload.truncated
     assert.ok(t.shownInFull + t.shownWithoutTraceOrLogs + t.namesOnly.length + t.notListed === 200)
     assert.equal(small.payload.failures.length, t.shownInFull + t.shownWithoutTraceOrLogs)
-    assert.ok(small.payload.failures.length >= 30, `${small.payload.failures.length} in full`)
+    // The first 5 failures carry trace excerpts (~600 B each), so fewer fit than without.
+    assert.ok(small.payload.failures.length >= 25, `${small.payload.failures.length} in full`)
+    assert.ok(small.payload.failures[0].trace, 'the first failure keeps its trace')
 
     const large = await callRunTests(root, { max_bytes: 65_536 })
     assert.ok(Buffer.byteLength(large.text) <= 65_536)

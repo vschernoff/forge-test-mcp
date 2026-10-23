@@ -1,9 +1,13 @@
+const { EXPLAIN_FAILURE_TOOL, explainFailure } = require('./explain-failure')
 const { RUN_TESTS_TOOL, runTests } = require('./run-tests')
 const { errorResult } = require('./tool-result')
 
 // FR-38: these are all the tools. None broadcasts, deploys, signs or accepts keys.
 function createTools(context) {
-  const tools = [{ ...RUN_TESTS_TOOL, run: (args) => runTests(context, args) }]
+  const tools = [
+    { ...RUN_TESTS_TOOL, run: (args) => runTests(context, args) },
+    { ...EXPLAIN_FAILURE_TOOL, run: (args) => explainFailure(context, args) },
+  ]
   return tools.map(({ run, ...definition }) => ({
     ...definition,
     handler: async (args) => {

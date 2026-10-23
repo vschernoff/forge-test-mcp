@@ -9,6 +9,7 @@
 //   SCRIPTED_FORGE_CONFIG_JSON  `config --json` output; …_OVERRIDDEN is used when FOUNDRY_CONFIG is set
 //   SCRIPTED_FORGE_CONFIG_TOML  `config` (TOML) output
 //   SCRIPTED_FORGE_{BUILD,TEST}_{STDOUT,CODE}, SCRIPTED_FORGE_TEST_STDERR
+//   SCRIPTED_FORGE_TEXT_{STDOUT,CODE}  for `test` without --json, when set (else TEST_*)
 //   SCRIPTED_FORGE_TEST_HANG    pid file: record this pid and a descendant's, then hang in `test`
 const { spawn } = require('node:child_process')
 const fs = require('node:fs')
@@ -48,11 +49,14 @@ if (args[0] === '--version') {
     fs.writeFileSync(env.SCRIPTED_FORGE_TEST_HANG, `${process.pid} ${descendant.pid}`)
     setInterval(() => {}, 1000)
   } else {
-    process.stdout.write(
-      env.SCRIPTED_FORGE_TEST_STDOUT ? fs.readFileSync(env.SCRIPTED_FORGE_TEST_STDOUT, 'utf8') : ''
-    )
+    // A text-mode run (the trace pass, explain_failure) may be scripted separately.
+    const text = !args.includes('--json') && env.SCRIPTED_FORGE_TEXT_STDOUT !== undefined
+    const stdout = text ? env.SCRIPTED_FORGE_TEXT_STDOUT : env.SCRIPTED_FORGE_TEST_STDOUT
+    process.stdout.write(stdout ? fs.readFileSync(stdout, 'utf8') : '')
     process.stderr.write(env.SCRIPTED_FORGE_TEST_STDERR ?? '')
-    process.exitCode = Number(env.SCRIPTED_FORGE_TEST_CODE ?? 0)
+    process.exitCode = Number(
+      (text ? env.SCRIPTED_FORGE_TEXT_CODE : undefined) ?? env.SCRIPTED_FORGE_TEST_CODE ?? 0
+    )
   }
 } else {
   process.stderr.write(`scripted forge: unexpected ${args.join(' ')}\n`)
