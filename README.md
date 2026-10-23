@@ -3,8 +3,9 @@
 An MCP server that runs Foundry's `forge test` and `forge build` and returns **compact,
 structured results** an AI coding agent can act on: for every failing test, its kind, the
 decoded reason, the fuzz counterexample or invariant call sequence, console logs and a short
-decoded trace. It works with any MCP client (Claude Code, Codex, Cursor, Claude Desktop,
-Windsurf, …).
+decoded trace. It speaks standard MCP over stdio and is meant for any MCP client (Claude Code,
+Codex, Cursor, Claude Desktop, Windsurf, …). So far it has been tested with an MCP test client,
+not yet inside each of those clients.
 
 When forge did **not** run the tests (a compile error, no matching tests, a timeout, a missing
 or unsupported `forge`, …) the tool says so as an error. It never reports "0 failed" for tests
@@ -40,8 +41,8 @@ Most clients accept this `mcpServers` entry:
 Pin an exact version. Client shortcuts, from each vendor's documentation (checked
 2026-10-23, not yet verified by running each client):
 
-- **Claude Code:** put the JSON above in `.mcp.json` at the project root. Claude Code asks you to
-  approve project servers the first time.
+- **Claude Code:** put the JSON above in `.mcp.json` at the project root. In interactive sessions
+  Claude Code asks you to approve project servers the first time.
 - **Cursor:** put it in `.cursor/mcp.json`, adding `"type": "stdio"` to the server entry.
 - **Codex:** in `.codex/config.toml` (loaded for trusted projects only) or `~/.codex/config.toml`:
 
@@ -146,7 +147,8 @@ What the server does to reduce that risk:
   as single `--flag=value` arguments.
 - **Secrets.** forge loads the project's `.env` itself, so tests can read and print those
   values. The server replaces the exact values of variables named like `*PRIVATE_KEY*`,
-  `*MNEMONIC*`, `*SECRET*`, `*TOKEN*` and `*API_KEY*` (from its environment and `.env`) with
+  `*MNEMONIC*`, `*SECRET*`, `*TOKEN*`, `*API_KEY*` and `*RPC_URL*` (RPC URLs often embed an API
+  key), from its environment and `.env`, with
   `[redacted:NAME]`. A hex value such as a private key is also caught without `0x`, in either
   case, without leading zeros, and in decimal (as `vm.envUint` and `console.log` print it). It
   cannot catch a secret printed in any other form. Keep spendable keys out of projects you
