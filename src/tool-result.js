@@ -8,8 +8,13 @@ function okResult(payload) {
 /** @param {{ code: string, message: string, hint?: string }} problem */
 function errorResult(problem, extra = {}) {
   const { code, message, hint, ...rest } = problem
-  delete rest.healthy
-  const payload = { error: { code, message, hint }, ...rest, ...extra }
+  // Internal flags, and fields with nothing to say, stay out of what the agent reads.
+  const details = Object.fromEntries(
+    Object.entries({ ...rest, ...extra }).filter(
+      ([key, value]) => !['healthy', 'ok'].includes(key) && value !== null && value !== ''
+    )
+  )
+  const payload = { error: { code, message, hint }, ...details }
   return { isError: true, content: [{ type: 'text', text: JSON.stringify(payload) }] }
 }
 
