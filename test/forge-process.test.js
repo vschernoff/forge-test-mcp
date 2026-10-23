@@ -5,6 +5,7 @@ const path = require('node:path')
 const test = require('node:test')
 
 const { runProcess } = require('../src/forge-process')
+const { killRecordedPids } = require('./helpers/cleanup')
 
 const FAKE_FORGE = [process.execPath, path.join(__dirname, 'helpers', 'fake-forge.js')]
 
@@ -74,8 +75,9 @@ test('reports the exit code and stderr of a failing process', async () => {
   assert.equal(result.timedOut, false)
 })
 
-test('kills the whole process tree on timeout and leaves no orphans (FR-37)', async () => {
+test('kills the whole process tree on timeout and leaves no orphans (FR-37)', async (t) => {
   const pidFile = path.join(tempDir(), 'grandchild.pid')
+  killRecordedPids(t, pidFile)
   const started = Date.now()
   const result = await run('hang-with-child', {
     timeoutMs: 1500,
@@ -90,8 +92,9 @@ test('kills the whole process tree on timeout and leaves no orphans (FR-37)', as
 test(
   'sweeps processes that forge left behind when it exits on its own (FR-37)',
   { skip: process.platform === 'win32' && 'Windows has no process groups to sweep after exit' },
-  async () => {
+  async (t) => {
     const pidFile = path.join(tempDir(), 'grandchild.pid')
+    killRecordedPids(t, pidFile)
     const result = await run('exit-leaving-child', { env: { FAKE_FORGE_PIDFILE: pidFile } })
     assert.equal(result.code, 0)
     const grandchild = Number(fs.readFileSync(pidFile, 'utf8'))
@@ -105,8 +108,9 @@ test('stops and flags output beyond the cap instead of buffering it all', async 
   assert.ok(result.stdout.length <= 1024 * 1024)
 })
 
-test('returns promptly when forge exits but a descendant holds its stdout open (FR-37)', async () => {
+test('returns promptly when forge exits but a descendant holds its stdout open (FR-37)', async (t) => {
   const pidFile = path.join(tempDir(), 'grandchild.pid')
+  killRecordedPids(t, pidFile)
   const started = Date.now()
   const result = await run('exit-with-stdout-holder', {
     timeoutMs: 60_000,
@@ -121,8 +125,9 @@ test('returns promptly when forge exits but a descendant holds its stdout open (
   assert.ok(await waitUntilDead(grandchild), `descendant ${grandchild} survived`)
 })
 
-test('escalates to SIGKILL when forge ignores SIGTERM on timeout (FR-37)', async () => {
+test('escalates to SIGKILL when forge ignores SIGTERM on timeout (FR-37)', async (t) => {
   const pidFile = path.join(tempDir(), 'forge.pid')
+  killRecordedPids(t, pidFile)
   const started = Date.now()
   const result = await run('ignore-sigterm', {
     timeoutMs: 1000,

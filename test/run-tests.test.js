@@ -8,6 +8,7 @@ const test = require('node:test')
 
 const { createContext } = require('../src/context')
 const { runTests } = require('../src/run-tests')
+const { killRecordedPids } = require('./helpers/cleanup')
 const { startServer } = require('./helpers/mcp-client')
 
 const SCRIPTED = path.join(__dirname, 'helpers', 'scripted-forge.js')
@@ -122,12 +123,13 @@ test('a forge newer than the tested range is flagged in the result (D19 Q2)', as
 test(
   'stopping the server kills a running forge and what it started (FR-37)',
   { skip: process.platform === 'win32' && 'needs an executable script as the forge binary' },
-  async () => {
+  async (t) => {
     const { root, calls } = project()
     const wrapper = path.join(root, 'forge')
     fs.writeFileSync(wrapper, `#!/bin/sh\nexec "${process.execPath}" "${SCRIPTED}" "$@"\n`)
     fs.chmodSync(wrapper, 0o755)
     const pids = path.join(root, '.forge-pids')
+    killRecordedPids(t, pids)
     const server = startServer({
       cwd: root,
       args: ['--forge', wrapper],
