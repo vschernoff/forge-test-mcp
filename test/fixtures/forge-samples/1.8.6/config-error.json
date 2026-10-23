@@ -1,0 +1,13 @@
+{
+  "forge": "1.8.6",
+  "args": [
+    "test",
+    "--json",
+    "--offline",
+    "-vv"
+  ],
+  "code": 1,
+  "signal": null,
+  "stdout": "",
+  "stderr": "Error: failed to extract foundry config:\nfoundry.toml error: TOML parse error at line 22, column 17\n   |\n22 | [profile.default\n   |                 ^\nunclosed table, expected `]`\n for key \"default.<PROJECT>/foundry.toml\" in foundry.toml TOML file for setting `<PROJECT>/foundry.toml`\n"
+}

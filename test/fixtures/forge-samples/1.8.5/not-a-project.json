@@ -1,0 +1,13 @@
+{
+  "forge": "1.8.5",
+  "args": [
+    "test",
+    "--json",
+    "--offline",
+    "-vv"
+  ],
+  "code": 0,
+  "signal": null,
+  "stdout": "Nothing to compile\n",
+  "stderr": ""
+}

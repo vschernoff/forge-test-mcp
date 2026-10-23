@@ -1,0 +1,13 @@
+{
+  "forge": "1.8.5",
+  "args": [
+    "test",
+    "--json",
+    "--offline",
+    "-vv"
+  ],
+  "code": 1,
+  "signal": null,
+  "stdout": "",
+  "stderr": "Error: can't install missing solc 0.8.37 in offline mode\n"
+}

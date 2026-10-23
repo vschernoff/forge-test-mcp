@@ -1,0 +1,13 @@
+{
+  "forge": "1.8.5",
+  "args": [
+    "test",
+    "--json",
+    "--offline",
+    "--fuzz-runs=--ffi"
+  ],
+  "code": 2,
+  "signal": null,
+  "stdout": "",
+  "stderr": "error: invalid value '--ffi' for '--fuzz-runs <RUNS>': invalid digit found in string\n\nFor more information, try '--help'.\n"
+}
