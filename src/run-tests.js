@@ -2,6 +2,7 @@ const { fitToBudget, DEFAULT_BUDGET, MIN_BUDGET, MAX_BUDGET } = require('./budge
 const { prepareConfig } = require('./forge-config')
 const { runProcess } = require('./forge-process')
 const { collectSecrets, redact } = require('./redact')
+const { attachTraces } = require('./trace-pass')
 const { classifyTestRun } = require('./run-health')
 const { summarizeReport } = require('./test-report')
 const { errorResult, okResult } = require('./tool-result')
@@ -42,6 +43,11 @@ const RUN_TESTS_TOOL = {
         maximum: 1_000_000,
         description:
           'Override fuzz runs. A value below the project setting is reported as reduced; do not use it to make tests pass.',
+      },
+      traces: {
+        type: 'boolean',
+        description:
+          'Attach a decoded trace excerpt to the first 5 failures (a second, text-mode forge run). Default true.',
       },
       max_bytes: {
         type: 'integer',
@@ -97,6 +103,10 @@ async function runTests(context, args = {}) {
     }
 
     const { failures, notRun } = summarizeReport(verdict.report)
+    const traceNote =
+      failures.length && args.traces !== false
+        ? await attachTraces({ context, root, env: config.env, failures })
+        : null
     const header = {
       status: verdict.counts.failed > 0 ? 'failed' : 'passed',
       forge: forgeVersion,
@@ -105,6 +115,7 @@ async function runTests(context, args = {}) {
       fuzzRuns: fuzzRunsNote(config.fuzzRuns, args.fuzz_runs),
       notRun,
     }
+    if (traceNote) header.traces = traceNote
     if (ready.untested) header.forgeUntested = ready.untested
     if (config.writableFsPermissions.length) {
       header.writableFsPermissions = config.writableFsPermissions

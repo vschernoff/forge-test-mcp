@@ -92,15 +92,13 @@ function countResults(report) {
 }
 
 /**
- * Classifies a finished `forge test --json` process.
+ * Checks shared by every forge invocation, before its output is read: did forge start, finish
+ * in time, stay within the output cap, avoid crashing, find its compiler and config, accept its
+ * arguments, compile the project, and find a project at all? Returns null when none applies.
  *
- * @param {{ code: number|null, signal: string|null, timedOut: boolean, outputTruncated: boolean,
- *   spawnError: NodeJS.ErrnoException|null, stdout: string, stderr: string }} run
- * @param {{ timeoutMs?: number }} [context]
- * @returns {{ healthy: true, report: object, counts: object } |
- *   { healthy: false, code: string, message: string, hint: string }}
+ * @param {'json'|'text'} mode  what stdout should contain when forge got as far as testing
  */
-function classifyTestRun(run, context = {}) {
+function classifyProcess(run, { timeoutMs, mode = 'json' } = {}) {
   if (run.spawnError) {
     const missing = ['ENOENT', 'EACCES', 'ENOTDIR'].includes(run.spawnError.code)
     return missing
@@ -108,7 +106,7 @@ function classifyTestRun(run, context = {}) {
       : unhealthy('FORGE_FAILED', `Could not start forge: ${run.spawnError.message}`, run)
   }
   if (run.timedOut) {
-    const seconds = context.timeoutMs ? ` after ${Math.round(context.timeoutMs / 1000)} s` : ''
+    const seconds = timeoutMs ? ` after ${Math.round(timeoutMs / 1000)} s` : ''
     return unhealthy('TIMEOUT', `forge was stopped${seconds}; no tests are reported.`, run)
   }
   if (run.outputTruncated) {
@@ -131,10 +129,12 @@ function classifyTestRun(run, context = {}) {
   if (run.code === 2 && !stdout && /^error: /m.test(stderr)) {
     return unhealthy('INVALID_ARGUMENTS', 'forge rejected the command-line arguments.', run)
   }
-  if (
-    /Compiler run failed|Compilation failed/.test(`${stderr}\n${stdout}`) &&
-    !stdout.startsWith('{')
-  ) {
+  const compileFailed =
+    mode === 'json'
+      ? /Compiler run failed|Compilation failed/.test(`${stderr}\n${stdout}`) &&
+        !stdout.startsWith('{')
+      : /Compiler run failed|Compilation failed/.test(stderr)
+  if (compileFailed) {
     return unhealthy('COMPILE_FAILED', 'The project does not compile, so no tests ran.', run)
   }
   if (!stdout) {
@@ -149,6 +149,22 @@ function classifyTestRun(run, context = {}) {
       run
     )
   }
+  return null
+}
+
+/**
+ * Classifies a finished `forge test --json` process.
+ *
+ * @param {{ code: number|null, signal: string|null, timedOut: boolean, outputTruncated: boolean,
+ *   spawnError: NodeJS.ErrnoException|null, stdout: string, stderr: string }} run
+ * @param {{ timeoutMs?: number }} [context]
+ * @returns {{ healthy: true, report: object, counts: object } |
+ *   { healthy: false, code: string, message: string, hint: string }}
+ */
+function classifyTestRun(run, context = {}) {
+  const problem = classifyProcess(run, { ...context, mode: 'json' })
+  if (problem) return problem
+  const stdout = stripAnsi(run.stdout).trim()
 
   let report
   try {
@@ -186,4 +202,35 @@ function classifyTestRun(run, context = {}) {
   return { healthy: true, report, counts }
 }
 
-module.exports = { classifyTestRun, stripAnsi, tail, unhealthy, HINTS }
+/**
+ * Classifies a finished text-mode `forge test -vvv…` process (used for decoded traces).
+ * Healthy means forge printed at least one test suite and its exit code agrees with the
+ * presence of [FAIL] lines.
+ */
+function classifyTextRun(run, context = {}) {
+  const problem = classifyProcess(run, { ...context, mode: 'text' })
+  if (problem) return problem
+  const stdout = stripAnsi(run.stdout)
+  if (!/^Ran \d+ tests? for /m.test(stdout)) {
+    return unhealthy('NO_TESTS_RAN', 'No tests ran.', run, { forgeSays: noMatchDetail(run.stderr) })
+  }
+  const failed = /^\[FAIL\b/m.test(stdout)
+  if (failed !== (run.code !== 0)) {
+    return unhealthy(
+      'INCONSISTENT_RESULT',
+      `forge exited ${run.code}, which its output contradicts.`,
+      run
+    )
+  }
+  return { healthy: true, text: stdout }
+}
+
+module.exports = {
+  classifyProcess,
+  classifyTestRun,
+  classifyTextRun,
+  stripAnsi,
+  tail,
+  unhealthy,
+  HINTS,
+}
