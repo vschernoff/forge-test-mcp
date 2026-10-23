@@ -13,9 +13,11 @@ on:
 permissions:
   contents: read
 
-# A newer push to the same pull request cancels the older run.
+# A newer push to the same pull request cancels the older run. Every other run (push to main,
+# nightly, dispatch) gets a group of its own: GitHub replaces a *pending* run when another one
+# joins its group, so a shared group could silently skip commits on main.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || format('run-{0}', github.run_id) }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
