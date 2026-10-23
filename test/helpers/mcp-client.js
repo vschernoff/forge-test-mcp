@@ -7,8 +7,8 @@ const readline = require('node:readline')
 
 const SERVER_ENTRY = path.resolve(__dirname, '..', '..', 'src', 'index.js')
 
-function startServer({ cwd, args = [], env = {} } = {}) {
-  const child = spawn(process.execPath, [SERVER_ENTRY, ...args], {
+function startServer({ cwd, args = [], env = {}, nodeArgs = [] } = {}) {
+  const child = spawn(process.execPath, [...nodeArgs, SERVER_ENTRY, ...args], {
     cwd,
     env: { ...process.env, ...env },
     stdio: ['pipe', 'pipe', 'pipe'],

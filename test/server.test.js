@@ -82,3 +82,23 @@ test('console output from server code goes to stderr, never to the protocol chan
   assert.match(result.stderr, /info line/)
   assert.match(result.stderr, /warn line/)
 })
+
+test('the real entry point installs the stdout guard before serving (FR-40)', async () => {
+  // Preloaded before src/index.js; the probe fires once index.js has run, as late
+  // console.log calls from server code or a dependency would.
+  const probe = path.join(tempDir(0), 'probe.js')
+  fs.writeFileSync(
+    probe,
+    "setImmediate(() => { console.log('stdout probe from server code'); console.info('info probe') })\n"
+  )
+  const server = startServer({ cwd: tempDir(0), nodeArgs: ['--require', probe] })
+  try {
+    await server.initialize()
+    await server.request('ping')
+    assert.deepEqual(server.invalidLines, [], 'nothing but JSON-RPC on stdout')
+    assert.match(server.stderr, /stdout probe from server code/)
+    assert.match(server.stderr, /info probe/)
+  } finally {
+    await server.stop()
+  }
+})
