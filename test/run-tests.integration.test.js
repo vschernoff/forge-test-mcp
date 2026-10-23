@@ -12,11 +12,11 @@ const { forgeBinary, makeProject, skipWithoutForge } = require('./helpers/projec
 const skip = skipWithoutForge()
 const CALL_TIMEOUT_MS = 240_000
 
-async function callRunTests(root, args = {}, serverArgs = []) {
+async function callTool(root, tool, args = {}, serverArgs = []) {
   const server = startServer({ cwd: root, args: ['--forge', forgeBinary(), ...serverArgs] })
   try {
     await server.initialize()
-    const response = await server.callTool('run_tests', args, CALL_TIMEOUT_MS)
+    const response = await server.callTool(tool, args, CALL_TIMEOUT_MS)
     assert.ok(response.result, JSON.stringify(response.error))
     // FR-40: forge's own output never reached the protocol channel.
     assert.deepEqual(server.invalidLines, [])
@@ -25,6 +25,10 @@ async function callRunTests(root, args = {}, serverArgs = []) {
   } finally {
     await server.stop()
   }
+}
+
+function callRunTests(root, args = {}, serverArgs = []) {
+  return callTool(root, 'run_tests', args, serverArgs)
 }
 
 function failure(payload, test) {
@@ -228,3 +232,48 @@ test('values of secret-named .env variables are redacted (D19 Q6)', { skip }, as
   assert.equal(rpc.reason, 'cannot reach [redacted:MAINNET_RPC_URL]')
   assert.deepEqual(rpc.logs, ['rpc [redacted:MAINNET_RPC_URL]'])
 })
+
+test('build returns structured compiler errors (FR-34)', { skip }, async () => {
+  const { isError, payload } = await callTool(await makeProject('compile-error'), 'build')
+  assert.equal(isError, false)
+  assert.equal(payload.status, 'failed')
+  assert.deepEqual(
+    payload.errors.map(({ file, line, column, type, code }) => ({
+      file,
+      line,
+      column,
+      type,
+      code,
+    })),
+    [{ file: 'src/Broken.sol', line: 13, column: 9, type: 'TypeError', code: '9574' }]
+  )
+})
+
+test('build reports warnings, then says when a cached build cannot (FR-34)', { skip }, async () => {
+  const root = await makeProject('warnings')
+  const first = await callTool(root, 'build')
+  assert.equal(first.payload.status, 'passed')
+  assert.equal(first.payload.compiled, 'fresh')
+  assert.deepEqual(
+    first.payload.warnings.map(({ file, line, code }) => ({ file, line, code })),
+    [{ file: 'src/Warn.sol', line: 6, code: '2072' }]
+  )
+  const second = await callTool(root, 'build')
+  assert.equal(second.payload.compiled, 'cached')
+  assert.equal(second.payload.summary.warnings, null)
+  assert.equal('warnings' in second.payload, false)
+  const forced = await callTool(root, 'build', { force: true })
+  assert.equal(forced.payload.warnings.length, 1)
+})
+
+test(
+  'run_tests on a broken build includes the compiler errors (FR-34, FR-35)',
+  { skip },
+  async () => {
+    const { payload } = await callRunTests(await makeProject('compile-error'))
+    assert.equal(payload.error.code, 'COMPILE_FAILED')
+    assert.equal(payload.compilerErrorsTotal, 1)
+    assert.equal(payload.compilerErrors[0].file, 'src/Broken.sol')
+    assert.equal(payload.compilerErrors[0].line, 13)
+  }
+)

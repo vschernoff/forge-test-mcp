@@ -1,6 +1,7 @@
 const { fitToBudget, DEFAULT_BUDGET, MIN_BUDGET, MAX_BUDGET } = require('./budget')
 const { prepareConfig } = require('./forge-config')
 const { runProcess } = require('./forge-process')
+const { compilerErrorsFor } = require('./build')
 const { collectSecrets, redact } = require('./redact')
 const { attachTraces } = require('./trace-pass')
 const { classifyTestRun } = require('./run-health')
@@ -99,7 +100,14 @@ async function runTests(context, args = {}) {
     const secrets = collectSecrets({ env: context.env, root })
     const verdict = classifyTestRun(run, { timeoutMs: context.options.timeoutMs })
     if (!verdict.healthy) {
-      return errorResult(redact(verdict, secrets), { forge: forgeVersion, ffi: config.ffi })
+      const compiler =
+        verdict.code === 'COMPILE_FAILED'
+          ? await compilerErrorsFor({ context, root, env: config.env })
+          : {}
+      return errorResult(redact({ ...verdict, ...compiler }, secrets), {
+        forge: forgeVersion,
+        ffi: config.ffi,
+      })
     }
 
     const { failures, notRun } = summarizeReport(verdict.report)

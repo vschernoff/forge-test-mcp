@@ -1,6 +1,7 @@
 const { DEFAULT_BUDGET, MIN_BUDGET, MAX_BUDGET } = require('./budget')
 const { prepareConfig } = require('./forge-config')
 const { runProcess } = require('./forge-process')
+const { compilerErrorsFor } = require('./build')
 const { collectSecrets, redact } = require('./redact')
 const { classifyTextRun, unhealthy } = require('./run-health')
 const { cleanText } = require('./test-report')
@@ -96,7 +97,14 @@ async function explainFailure(context, args = {}) {
     const secrets = collectSecrets({ env: context.env, root })
     const verdict = classifyTextRun(run, { timeoutMs: context.options.timeoutMs })
     if (!verdict.healthy) {
-      return errorResult(redact(verdict, secrets), { forge: forgeVersion, ffi: config.ffi })
+      const compiler =
+        verdict.code === 'COMPILE_FAILED'
+          ? await compilerErrorsFor({ context, root, env: config.env })
+          : {}
+      return errorResult(redact({ ...verdict, ...compiler }, secrets), {
+        forge: forgeVersion,
+        ffi: config.ffi,
+      })
     }
 
     const entries = [...parseTextReport(verdict.text)].filter(([id]) =>

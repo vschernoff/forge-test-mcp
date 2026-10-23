@@ -1,3 +1,4 @@
+const { BUILD_TOOL, build } = require('./build')
 const { EXPLAIN_FAILURE_TOOL, explainFailure } = require('./explain-failure')
 const { RUN_TESTS_TOOL, runTests } = require('./run-tests')
 const { errorResult } = require('./tool-result')
@@ -7,6 +8,7 @@ function createTools(context) {
   const tools = [
     { ...RUN_TESTS_TOOL, run: (args) => runTests(context, args) },
     { ...EXPLAIN_FAILURE_TOOL, run: (args) => explainFailure(context, args) },
+    { ...BUILD_TOOL, run: (args) => build(context, args) },
   ]
   return tools.map(({ run, ...definition }) => ({
     ...definition,
