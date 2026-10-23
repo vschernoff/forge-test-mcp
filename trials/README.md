@@ -65,7 +65,9 @@ uses (schema `forge-test-mcp/trial-run@1`, agreed with the Evaluator):
 `<task>/<arm>/run-<n>.json`, plus the verbatim `run-<n>.transcript.jsonl` (its sha256 is
 in the record) and `summary.json`. Each record holds:
 
-- **success**: `passed` is true only when real forge passes with at least one test executed
+- **success**: `passed` is true only when real forge (run like the server does: `--offline`,
+  FFI forced off, and only allow-listed environment variables) passes with at least one test
+  executed
   and the agent changed no test file and not `foundry.toml`. `check` and `detail` say how this
   was decided.
 - **workspace**: `baseCommit`, and `finalCommit`, which is the agent's changes, committed by

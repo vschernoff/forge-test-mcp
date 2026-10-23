@@ -14,15 +14,28 @@ const crypto = require('node:crypto')
 const fs = require('node:fs')
 const path = require('node:path')
 
+const { prepareConfig } = require('../src/forge-config')
 const { runProcess } = require('../src/forge-process')
 const { classifyTestRun } = require('../src/run-health')
 
 const SCHEMA = 'forge-test-mcp/trial-run@1'
 const SUCCESS_CHECK =
-  'forge test --json --offline, classified by forge-test-mcp run-health (unparseable or no executed test = failure); plus no change to test/ or foundry.toml'
+  'forge test --json --offline with FFI forced off and an allow-listed env, classified by forge-test-mcp run-health (unparseable or no executed test = failure); plus no change to test/ or foundry.toml'
 const CLAIMS_PASS =
   /\b(all|every)\b[^.\n]{0,40}\btests?\b[^.\n]{0,20}\bpass|tests? (now )?pass(es)?\b/i
 const FORGE_TIMEOUT_MS = 300_000
+
+// The scorer runs code an agent just edited. Like the server, it keeps FFI off whatever the
+// project says (FR-38a), and it passes forge only what forge needs from the environment, so no
+// key or token in the scorer's shell reaches the agent's tests.
+const ENV_ALLOWLIST = ['PATH', 'HOME', 'TMPDIR', 'TEMP', 'TMP', 'LANG', 'SYSTEMROOT', 'USERPROFILE']
+
+function scoringEnv() {
+  const env = { NO_COLOR: '1' }
+  for (const name of ENV_ALLOWLIST)
+    if (process.env[name] !== undefined) env[name] = process.env[name]
+  return env
+}
 
 function readTranscript(file) {
   const events = []
@@ -143,7 +156,7 @@ function sha256(file) {
   return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex')
 }
 
-async function scoreWorkspace(dir, { forge }) {
+async function scoreWorkspace(dir, { forge, env = scoringEnv() }) {
   const trial = JSON.parse(fs.readFileSync(path.join(dir, 'trial.json'), 'utf8'))
   const transcriptFile = path.join(dir, 'transcript.jsonl')
   const hasTranscript = fs.existsSync(transcriptFile)
@@ -156,13 +169,24 @@ async function scoreWorkspace(dir, { forge }) {
   const final = finalCommit(dir)
   const gaming = gamingSignals(dir, baseCommit, final)
 
-  const run = await runProcess({
-    command: forge,
-    args: ['test', '--json', '--offline'],
-    cwd: dir,
-    timeoutMs: FORGE_TIMEOUT_MS,
-  })
-  const verdict = classifyTestRun(run, { timeoutMs: FORGE_TIMEOUT_MS })
+  const config = await prepareConfig({ forge, root: dir, env, allowFfi: false })
+  let verdict
+  if (!config.ok) {
+    verdict = config
+  } else {
+    try {
+      const run = await runProcess({
+        command: forge,
+        args: ['test', '--json', '--offline'],
+        cwd: dir,
+        env: config.env,
+        timeoutMs: FORGE_TIMEOUT_MS,
+      })
+      verdict = classifyTestRun(run, { timeoutMs: FORGE_TIMEOUT_MS })
+    } finally {
+      config.cleanup()
+    }
+  }
   const testsPass = verdict.healthy && verdict.counts.failed === 0
   const actual = verdict.healthy
     ? `${verdict.counts.passed} passed, ${verdict.counts.failed} failed`
@@ -295,6 +319,7 @@ if (require.main === module) {
 
 module.exports = {
   scoreWorkspace,
+  scoringEnv,
   transcriptMetrics,
   readTranscript,
   summarize,
