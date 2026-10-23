@@ -147,8 +147,10 @@ What the server does to reduce that risk:
 - **Secrets.** forge loads the project's `.env` itself, so tests can read and print those
   values. The server replaces the exact values of variables named like `*PRIVATE_KEY*`,
   `*MNEMONIC*`, `*SECRET*`, `*TOKEN*` and `*API_KEY*` (from its environment and `.env`) with
-  `[redacted:NAME]`. It cannot catch a secret printed in another form. Keep spendable keys
-  out of projects you test with an agent.
+  `[redacted:NAME]`. A hex value such as a private key is also caught without `0x`, in either
+  case, without leading zeros, and in decimal (as `vm.envUint` and `console.log` print it). It
+  cannot catch a secret printed in any other form. Keep spendable keys out of projects you
+  test with an agent.
 - **No transactions.** No tool broadcasts, deploys, signs or takes a key.
 
 **Passing tests do not prove a contract is secure.** They show the tests you wrote pass.
