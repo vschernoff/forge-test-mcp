@@ -105,7 +105,10 @@ async function runTests(context, args = {}) {
     const { failures, notRun } = summarizeReport(verdict.report)
     const traceNote =
       failures.length && args.traces !== false
-        ? await attachTraces({ context, root, env: config.env, failures })
+        ? await attachTraces({ context, root, env: config.env, failures }).catch(
+            // The run itself was healthy; a broken trace pass must not take its verdict away.
+            (error) => `unavailable: ${error.message}`
+          )
         : null
     const header = {
       status: verdict.counts.failed > 0 ? 'failed' : 'passed',

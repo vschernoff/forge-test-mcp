@@ -122,6 +122,16 @@ test('explain_failure keeps FFI off and redacts secrets (FR-38a, D19 Q6)', { ski
   )
   assert.ok(!secret.text.includes('dummy-etherscan-token-for-tests'))
   assert.match(secret.payload.reason, /\[redacted:DEPLOYER_PRIVATE_KEY\]/)
+
+  // The decoded trace shows the key as a number in cheatcode and console.log arguments.
+  const root = await makeProject('secret-env')
+  const decimal = BigInt(`0x${'11'.repeat(32)}`).toString()
+  const asNumber = await call(root, 'explain_failure', { test: 'test_leaksDotenvAsNumber' })
+  assert.ok(!asNumber.text.includes(decimal), 'decimal key leaked from the trace')
+  assert.ok(asNumber.payload.trace.some((l) => /console::log\("pk", \[redacted:/.test(l)))
+  const run = await call(root, 'run_tests')
+  assert.ok(!run.text.includes(decimal), 'decimal key leaked from run_tests traces')
+  assert.ok(!run.text.includes('dummyrpcapikey123456'), 'RPC URL leaked from run_tests')
 })
 
 test('a compile error is an error for explain_failure too (FR-35)', { skip }, async () => {
