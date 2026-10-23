@@ -11,7 +11,7 @@
   "scripts": {
     "start": "node src/index.js",
     "test": "node --test --test-concurrency=1 --test-timeout=240000 \"test/*.test.js\"",
-    "lint": "eslint src test && prettier --check .",
+    "lint": "eslint src test trials && prettier --check .",
     "format": "prettier --write .",
     "test:packed": "node test/packed-smoke.js"
   },

@@ -1,0 +1,58 @@
+{
+  "$comment": "D16 agent trials for the M3 exit criterion (SRS §11): with forge-test-mcp an agent needs fewer turns or tokens than with raw `forge test -vvvv`. Same prompt in both arms except the one sentence naming the tools. Fixtures are test/fixtures/projects/*; success is decided by trials/score.js with real forge, never by the agent.",
+  "tasks": [
+    {
+      "id": "fix-assert",
+      "fixture": "assert-failure",
+      "prompt": "The tests in this Foundry project fail. Find out why and fix the contract in src/ so that every test passes. Do not change, skip or delete any test, and do not change foundry.toml."
+    },
+    {
+      "id": "fix-fuzz",
+      "fixture": "fuzz-failure",
+      "prompt": "A fuzz test in this Foundry project fails. Find out why and fix the code in src/ so that every test passes for all inputs. Do not change, skip or delete any test, do not bound the fuzz inputs, and do not change foundry.toml."
+    },
+    {
+      "id": "fix-invariant",
+      "fixture": "invariant-failure",
+      "prompt": "An invariant test in this Foundry project fails. Find out why and fix the contract in src/ so that every test passes. Do not change, skip or delete any test, and do not change foundry.toml."
+    },
+    {
+      "id": "fix-compile",
+      "fixture": "compile-error",
+      "prompt": "This Foundry project does not compile. Fix the source in src/ so that it compiles and every test passes. Do not change, skip or delete any test, and do not change foundry.toml."
+    }
+  ],
+  "arms": {
+    "mcp": {
+      "toolSentence": "Use the forge-test MCP tools (run_tests, explain_failure, build) to build and test.",
+      "allowedTools": [
+        "Read",
+        "Edit",
+        "Write",
+        "Glob",
+        "Grep",
+        "mcp__forge-test__run_tests",
+        "mcp__forge-test__explain_failure",
+        "mcp__forge-test__build"
+      ],
+      "disallowedTools": ["Bash"]
+    },
+    "shell": {
+      "toolSentence": "Use `forge build` and `forge test -vvvv` in the shell to build and test.",
+      "allowedTools": [
+        "Read",
+        "Edit",
+        "Write",
+        "Glob",
+        "Grep",
+        "Bash(forge build)",
+        "Bash(forge build *)",
+        "Bash(forge test)",
+        "Bash(forge test *)"
+      ],
+      "disallowedTools": ["mcp__*"]
+    }
+  },
+  "runsPerArm": 3,
+  "maxTurns": 30
+}
