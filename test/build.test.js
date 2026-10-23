@@ -5,6 +5,7 @@ const path = require('node:path')
 const test = require('node:test')
 
 const { build, locate } = require('../src/build')
+const { runTests } = require('../src/run-tests')
 const { createContext } = require('../src/context')
 
 const SCRIPTED = [process.execPath, path.join(__dirname, 'helpers', 'scripted-forge.js')]
@@ -31,7 +32,7 @@ function entry(severity, file, line, code = '2072', message = 'Unused local vari
   }
 }
 
-async function runBuild(output, { code = 0, args = {}, root = project() } = {}) {
+async function runBuild(output, { code = 0, args = {}, root = project(), env = {} } = {}) {
   const stdout = path.join(root, 'build-stdout.json')
   const log = path.join(root, 'calls.log')
   fs.writeFileSync(stdout, typeof output === 'string' ? output : JSON.stringify(output))
@@ -43,6 +44,7 @@ async function runBuild(output, { code = 0, args = {}, root = project() } = {}) 
       SCRIPTED_FORGE_BUILD_STDOUT: stdout,
       SCRIPTED_FORGE_BUILD_CODE: String(code),
       SCRIPTED_FORGE_LOG: log,
+      ...env,
     },
     options: { allowFfi: false, strictVersion: false, timeoutMs: 10_000 },
   })
@@ -120,4 +122,50 @@ test('locate falls back to the byte offset when solc gives no position', () => {
     column: 3,
   })
   assert.deepEqual(locate(root, {}), { file: null, line: null, column: null })
+})
+
+// Compiler messages quote source literals, so a key pasted into a contract comes back in them.
+const KEY = `0x${'33'.repeat(32)}`
+const leak = () =>
+  entry(
+    'error',
+    'src/Leak.sol',
+    3,
+    '9574',
+    `Type literal_string "${KEY}" is not implicitly convertible to expected type uint256.`
+  )
+
+test('a secret quoted in a compiler message is redacted in build results (D19 Q6)', async () => {
+  const { result, payload } = await runBuild(fresh([leak()]), {
+    code: 1,
+    env: { DEPLOYER_PRIVATE_KEY: KEY },
+  })
+  assert.ok(!result.content[0].text.includes('33'.repeat(32)))
+  assert.match(payload.errors[0].message, /literal_string "\[redacted:DEPLOYER_PRIVATE_KEY\]"/)
+})
+
+test('a secret quoted in a compile error is redacted on the run_tests error path too', async () => {
+  const root = project()
+  const buildOut = path.join(root, 'build-stdout.json')
+  fs.writeFileSync(buildOut, JSON.stringify(fresh([leak()])))
+  const context = createContext({
+    forge: SCRIPTED,
+    startDir: root,
+    env: {
+      ...process.env,
+      DEPLOYER_PRIVATE_KEY: KEY,
+      SCRIPTED_FORGE_TEST_STDOUT: '',
+      SCRIPTED_FORGE_TEST_STDERR: `Error: Compiler run failed:\nError (9574): Type literal_string "${KEY}"\n`,
+      SCRIPTED_FORGE_TEST_CODE: '1',
+      SCRIPTED_FORGE_BUILD_STDOUT: buildOut,
+      SCRIPTED_FORGE_BUILD_CODE: '1',
+    },
+    options: { allowFfi: false, strictVersion: false, timeoutMs: 10_000 },
+  })
+  const result = await runTests(context, {})
+  const payload = JSON.parse(result.content[0].text)
+  assert.equal(payload.error.code, 'COMPILE_FAILED')
+  assert.ok(!result.content[0].text.includes('33'.repeat(32)), 'key leaked')
+  assert.match(payload.stderr, /\[redacted:DEPLOYER_PRIVATE_KEY\]/)
+  assert.match(payload.compilerErrors[0].message, /\[redacted:DEPLOYER_PRIVATE_KEY\]/)
 })
