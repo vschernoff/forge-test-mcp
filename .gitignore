@@ -1,0 +1,9 @@
+node_modules/
+*.tgz
+.DS_Store
+.env
+coverage/
+# forge output inside test fixtures
+test/fixtures/**/out/
+test/fixtures/**/cache/
+test/fixtures/**/lib/forge-std/
