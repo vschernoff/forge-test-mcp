@@ -9,11 +9,13 @@
 # forge writes out/ and cache/ into the project, so on Linux add --user "$(id -u):$(id -g)" to
 # both commands. The server runs forge with --offline; it never downloads anything itself.
 
-FROM node:24-alpine
+# Pinned by digest (the multi-arch index of node:24-alpine on 2026-10-23); bump deliberately.
+FROM node:24-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53
 
 # forge 1.8.6, the official static Alpine build. Both the release tarball and the forge binary
 # in it are checked against the digests of the release's SLSA provenance attestation
-# (release.yml@refs/tags/v1.8.6, commit 6bad0a66de7c83f7b33695044138f0f5fa4c5990).
+# (release.yml@refs/tags/v1.8.6, commit 6bad0a66de7c83f7b33695044138f0f5fa4c5990). This build
+# reports itself as "1.8.6-dev"; the server recognises the release by that commit.
 ARG FOUNDRY_VERSION=v1.8.6
 ARG TARGETARCH
 RUN set -eu; \
@@ -35,7 +37,7 @@ RUN set -eu; \
 # Production dependencies first, so this layer is cached across source edits.
 WORKDIR /opt/forge-test-mcp
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev && npm cache clean --force
+RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 COPY src/ ./src/
 COPY README.md LICENSE NOTICE ./
 

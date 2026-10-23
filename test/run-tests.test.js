@@ -114,7 +114,7 @@ test('an honoured FFI override is what the test run actually gets (FR-38a)', asy
 test('a forge newer than the tested range is flagged in the result (D19 Q2)', async () => {
   const { payload } = await run({ env: { SCRIPTED_FORGE_VERSION: 'forge Version: 1.9.0\n' } })
   assert.equal(payload.forge, '1.9.0')
-  assert.match(payload.forgeUntested, /outside the tested range >=1\.8\.5 <1\.9\.0/)
+  assert.match(payload.forgeUntested, /newer than the tested range >=1\.8\.5 <1\.9\.0/)
   const { payload: supported } = await run()
   assert.equal(supported.forgeUntested, undefined)
 })

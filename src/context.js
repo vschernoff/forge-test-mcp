@@ -33,13 +33,15 @@ function createContext({ forge, startDir, env = process.env, options }) {
     if (!parsed) {
       return unhealthy('UNSUPPORTED_FORGE_VERSION', 'Could not read the forge version.', run)
     }
-    const { status, version } = assessForgeVersion(parsed)
+    const { status, version, reason } = assessForgeVersion(parsed)
     const refuse = status === 'too-old' || (status === 'untested' && options.strictVersion)
     if (refuse) {
       return {
         ...unhealthy(
           'UNSUPPORTED_FORGE_VERSION',
-          `forge ${version} is outside the supported range ${SUPPORTED.range}.`,
+          status === 'too-old'
+            ? `forge ${version} is older than the supported range ${SUPPORTED.range}.`
+            : `forge ${version} is ${reason === 'prerelease' ? 'a pre-release build' : 'newer than the tested range'} and --strict-version is set (supported: ${SUPPORTED.range}).`,
           null
         ),
         hint: `Install a supported version, e.g. \`foundryup -i ${RECOMMENDED}\`.`,
@@ -49,7 +51,12 @@ function createContext({ forge, startDir, env = process.env, options }) {
     versionCache = {
       ok: true,
       forgeVersion: version,
-      untested: status === 'untested' ? `outside the tested range ${SUPPORTED.range}` : null,
+      untested:
+        status !== 'untested'
+          ? null
+          : reason === 'prerelease'
+            ? `a pre-release build, not a tested release (tested range ${SUPPORTED.range})`
+            : `newer than the tested range ${SUPPORTED.range}`,
     }
     return versionCache
   }

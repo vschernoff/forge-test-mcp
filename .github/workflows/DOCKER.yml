@@ -89,6 +89,10 @@ jobs:
             if (!call || call.isError) throw new Error("run_tests failed: " + JSON.stringify(call))
             const report = JSON.parse(call.content[0].text)
             const f = report.failures?.[0]
+            // The Alpine build reports 1.8.6-dev; it must still count as the tested 1.8.6 release.
+            if (report.forge !== "1.8.6" || report.forgeUntested) {
+              throw new Error("forge not recognised as the 1.8.6 release: " + JSON.stringify(report))
+            }
             if (report.status !== "failed" || report.summary.passed !== 1 || report.summary.failed !== 1 ||
                 f?.test !== "SmokeTest.test_fails()" || f?.reason !== "arithmetic is broken") {
               throw new Error("unexpected report: " + JSON.stringify(report))
