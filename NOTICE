@@ -1,0 +1,16 @@
+forge-test-mcp
+==============
+
+Copyright (c) 2026 Vitaliy Chernov. Licensed under the MIT licence in LICENSE.
+
+Runtime dependencies (installed by npm, not bundled):
+  @modelcontextprotocol/server, @modelcontextprotocol/core
+    Apache-2.0 — https://github.com/modelcontextprotocol/typescript-sdk
+  zod
+    MIT — https://github.com/colinhacks/zod
+
+Run as a separate program, never bundled:
+  Foundry (forge) — MIT OR Apache-2.0 — https://github.com/foundry-rs/foundry
+
+Fetched by the test suite only, never shipped:
+  forge-std — MIT OR Apache-2.0 — https://github.com/foundry-rs/forge-std
