@@ -1,0 +1,13 @@
+{
+  "forge": "1.8.5",
+  "args": [
+    "test",
+    "--json",
+    "--offline",
+    "-vv"
+  ],
+  "code": 1,
+  "signal": null,
+  "stdout": "{\"test/Bank.t.sol:BankTest\":{\"duration\":\"1ms 77µs 83ns\",\"test_results\":{\"test_credit()\":{\"status\":\"Success\",\"reason\":null,\"counterexample\":null,\"logs\":[],\"decoded_logs\":[],\"kind\":{\"Unit\":{\"gas\":10615}},\"traces\":[],\"labeled_addresses\":{},\"duration\":\"114µs\",\"breakpoints\":{},\"gas_snapshots\":{}},\"test_transfer()\":{\"status\":\"Failure\",\"reason\":\"balance mismatch: 99 != 100\",\"counterexample\":null,\"logs\":[],\"decoded_logs\":[],\"kind\":{\"Unit\":{\"gas\":70351}},\"traces\":[],\"labeled_addresses\":{},\"duration\":\"622µs 375ns\",\"breakpoints\":{},\"gas_snapshots\":{}}},\"warnings\":[]}}\n",
+  "stderr": ""
+}

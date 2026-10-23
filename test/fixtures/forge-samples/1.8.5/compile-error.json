@@ -1,0 +1,13 @@
+{
+  "forge": "1.8.5",
+  "args": [
+    "test",
+    "--json",
+    "--offline",
+    "-vv"
+  ],
+  "code": 1,
+  "signal": null,
+  "stdout": "",
+  "stderr": "Error: Compiler run failed:\nError (9574): Type literal_string \"not a number\" is not implicitly convertible to expected type uint256.\n  --> src/Broken.sol:13:9:\n   |\n13 |         uint256 x = \"not a number\"; // @gt:compile-error\n   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^\n"
+}
