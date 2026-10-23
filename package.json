@@ -1,0 +1,58 @@
+{
+  "name": "forge-test-mcp",
+  "version": "0.0.0",
+  "private": true,
+  "mcpName": "io.github.vschernoff/forge-test-mcp",
+  "description": "MCP server that runs Foundry builds and tests and returns compact, structured failures to any MCP client (Claude Code, Codex, Cursor, and others)",
+  "main": "src/index.js",
+  "bin": {
+    "forge-test-mcp": "src/index.js"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --test --test-concurrency=1 \"test/*.test.js\"",
+    "lint": "eslint src test && prettier --check .",
+    "format": "prettier --write ."
+  },
+  "keywords": [
+    "solidity",
+    "foundry",
+    "forge",
+    "testing",
+    "smart-contracts",
+    "mcp",
+    "model-context-protocol",
+    "ai-agent",
+    "claude",
+    "codex",
+    "cursor"
+  ],
+  "author": "Vitaliy Chernov",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vschernoff/forge-test-mcp.git"
+  },
+  "homepage": "https://github.com/vschernoff/forge-test-mcp#readme",
+  "bugs": {
+    "url": "https://github.com/vschernoff/forge-test-mcp/issues"
+  },
+  "files": [
+    "src/",
+    "README.md",
+    "LICENSE"
+  ],
+  "foundryCompatibility": ">=1.8.5 <1.9.0",
+  "dependencies": {
+    "@modelcontextprotocol/server": "2.3.1"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.12.0",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.3.3"
+  }
+}

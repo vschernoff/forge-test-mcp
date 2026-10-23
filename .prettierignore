@@ -1,0 +1,6 @@
+node_modules/
+coverage/
+package-lock.json
+test/fixtures/**/lib/
+test/fixtures/**/out/
+test/fixtures/**/cache/
