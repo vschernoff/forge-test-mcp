@@ -12,7 +12,8 @@
     "start": "node src/index.js",
     "test": "node --test --test-concurrency=1 --test-timeout=240000 \"test/*.test.js\"",
     "lint": "eslint src test && prettier --check .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "test:packed": "node test/packed-smoke.js"
   },
   "keywords": [
     "solidity",
@@ -40,7 +41,8 @@
   "files": [
     "src/",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "NOTICE"
   ],
   "foundryCompatibility": ">=1.8.5 <1.9.0",
   "dependencies": {

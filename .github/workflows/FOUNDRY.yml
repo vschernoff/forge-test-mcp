@@ -45,3 +45,5 @@ jobs:
       # itself always runs forge with --offline.
       - run: node test/helpers/prepare-forge.js
       - run: npm test
+      # The installed package, not the working tree, against the same forge.
+      - run: npm run test:packed
