@@ -13,4 +13,11 @@ contract SecretTest is Test {
         console.log("token", token);
         revert(string.concat("leaked ", key));
     }
+
+    /// The same key read as a number reaches the output in decimal.
+    function test_leaksDotenvAsNumber() public view {
+        uint256 pk = vm.envUint("DEPLOYER_PRIVATE_KEY");
+        console.log("pk", pk);
+        revert(vm.toString(pk));
+    }
 }

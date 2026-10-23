@@ -37,6 +37,22 @@ test('a hex key is found with or without 0x and in any case', () => {
   }
 })
 
+test('a hex key is also found in decimal, and forge’s number annotation goes with it', () => {
+  const secrets = collectSecrets({ env: { DEPLOYER_PRIVATE_KEY: KEY }, root: project() })
+  const decimal = BigInt(KEY).toString(10)
+  assert.equal(
+    redact(`key ${decimal} [7.762e76] then`, secrets),
+    'key [redacted:DEPLOYER_PRIVATE_KEY] then'
+  )
+  assert.equal(redact(`pk=${decimal}`, secrets), 'pk=[redacted:DEPLOYER_PRIVATE_KEY]')
+})
+
+test('a hex key with leading zeros is also found without them', () => {
+  const padded = `0x0000${'ab'.repeat(30)}`
+  const secrets = collectSecrets({ env: { PRIVATE_KEY: padded }, root: project() })
+  assert.equal(redact(`0x${'ab'.repeat(30)}`, secrets), '[redacted:PRIVATE_KEY]')
+})
+
 test('does not redact by shape: other bytes32 values survive', () => {
   const secrets = collectSecrets({ env: { PRIVATE_KEY: KEY }, root: project() })
   const other = `0x${'9'.repeat(64)}`

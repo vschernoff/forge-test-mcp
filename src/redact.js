@@ -36,11 +36,19 @@ function collectSecrets({ env = process.env, root }) {
       const value = String(raw ?? '').trim()
       if (!SECRET_NAME.test(name) || value.length < MIN_LENGTH) continue
       secrets.set(value, name)
-      // A hex key may be printed with or without 0x and in either case.
+      // A hex key may be printed with or without 0x, in either case, without leading zeros,
+      // or, read as a number (vm.envUint, console.log of a uint), in decimal.
       const hex = value.match(/^(0x)?([0-9a-fA-F]{16,})$/)
       if (hex) {
-        secrets.set(hex[2].toLowerCase(), name)
-        secrets.set(`0x${hex[2].toLowerCase()}`, name)
+        const digits = hex[2].toLowerCase()
+        const trimmed = digits.replace(/^0+/, '')
+        for (const form of [digits, `0x${digits}`, trimmed, `0x${trimmed}`]) {
+          if (form.replace(/^0x/, '').length >= MIN_LENGTH) secrets.set(form, name)
+        }
+        if (digits.length <= 64) {
+          const decimal = BigInt(`0x${digits}`).toString(10)
+          if (decimal.length >= MIN_LENGTH) secrets.set(decimal, name)
+        }
       }
     }
   }
@@ -60,7 +68,9 @@ function redactString(text, secrets) {
       `[redacted:${name}]`
     )
   }
-  return out
+  // forge annotates large numbers ("… [7.7e75]"); after a redacted number that annotation would
+  // still give away the leading digits.
+  return out.replace(/(\[redacted:[^\]]+\]) \[\d+(?:\.\d+)?e\d+\]/g, '$1')
 }
 
 /** Returns a deep copy of `value` with every secret value replaced. */

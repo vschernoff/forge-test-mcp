@@ -214,4 +214,10 @@ test('values of secret-named .env variables are redacted (D19 Q6)', { skip }, as
     'key [redacted:DEPLOYER_PRIVATE_KEY]',
     'token [redacted:ETHERSCAN_API_KEY]',
   ])
+  // Read with vm.envUint, the same key reaches logs and the revert reason in decimal.
+  const decimal = BigInt(`0x${'11'.repeat(32)}`).toString()
+  assert.ok(!text.includes(decimal), 'decimal key leaked')
+  const asNumber = failure(payload, 'SecretTest.test_leaksDotenvAsNumber()')
+  assert.equal(asNumber.reason, '[redacted:DEPLOYER_PRIVATE_KEY]')
+  assert.deepEqual(asNumber.logs, ['pk [redacted:DEPLOYER_PRIVATE_KEY]'])
 })
