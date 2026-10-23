@@ -1,5 +1,6 @@
-// Static on purpose (FR-39): Codex keeps roughly the first 512 characters of this field, and
-// an interpolated path would make the length vary by machine. Behaviour comes first.
+// Static on purpose (FR-39). Codex's guidance is to keep the first ~512 characters of this field
+// self-contained (SRS C2; a recommendation, not a documented cut-off), and an interpolated path
+// would make the length vary by machine. Behaviour comes first.
 const INSTRUCTIONS =
   'Runs Foundry builds and tests and returns compact, structured failures. ' +
   'After changing Solidity, call run_tests before calling the work done. ' +

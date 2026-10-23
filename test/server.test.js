@@ -8,8 +8,9 @@ const test = require('node:test')
 const packageJson = require('../package.json')
 const { startServer } = require('./helpers/mcp-client')
 
-// Codex keeps roughly the first 512 characters of `instructions` (SRS C2). This is a client
-// behaviour, not an MCP limit, but it is the budget the field is written for.
+// Codex's guidance is to keep the first ~512 characters of `instructions` self-contained
+// (SRS C2). It is a client recommendation, not an MCP limit, but it is the budget the field is
+// written for.
 const INSTRUCTIONS_BUDGET = 512
 
 // FR-38: the complete tool list. A tool that could broadcast, deploy, sign or take a key
