@@ -1,12 +1,12 @@
 const assert = require('node:assert/strict')
 const { spawnSync } = require('node:child_process')
 const fs = require('node:fs')
-const os = require('node:os')
 const path = require('node:path')
 const test = require('node:test')
 
 const packageJson = require('../package.json')
 const { startServer } = require('./helpers/mcp-client')
+const { tempDir: makeTempDir } = require('./helpers/tmp')
 
 // Codex's guidance is to keep the first ~512 characters of `instructions` self-contained
 // (SRS C2). It is a client recommendation, not an MCP limit, but it is the budget the field is
@@ -18,7 +18,7 @@ const INSTRUCTIONS_BUDGET = 512
 const EXPECTED_TOOLS = ['build', 'explain_failure', 'run_tests']
 
 function tempDir(depth) {
-  let dir = fs.mkdtempSync(path.join(os.tmpdir(), 'forge-test-mcp-server-'))
+  let dir = makeTempDir('forge-test-mcp-server-')
   for (let i = 0; i < depth; i++) dir = path.join(dir, `level-${i}-with-a-longer-name`)
   fs.mkdirSync(dir, { recursive: true })
   return dir

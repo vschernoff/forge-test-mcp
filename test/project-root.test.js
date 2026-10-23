@@ -1,13 +1,13 @@
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
-const os = require('node:os')
 const path = require('node:path')
 const test = require('node:test')
 
 const { findFoundryRoot } = require('../src/project-root')
+const { tempDir } = require('./helpers/tmp')
 
 function tree(files) {
-  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'forge-test-mcp-root-')))
+  const root = tempDir('forge-test-mcp-root-')
   for (const file of files) {
     const target = path.join(root, file)
     if (file.endsWith('/')) fs.mkdirSync(target, { recursive: true })
