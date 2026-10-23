@@ -18,6 +18,7 @@ module.exports = [
         clearTimeout: 'readonly',
         setInterval: 'readonly',
         Buffer: 'readonly',
+        fetch: 'readonly',
       },
     },
     rules: { 'no-console': 'off' },

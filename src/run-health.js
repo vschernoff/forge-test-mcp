@@ -15,6 +15,8 @@ const HINTS = {
   NOT_A_FOUNDRY_PROJECT:
     'Start the server in a Foundry project (a directory with foundry.toml, or below one inside the same git repository).',
   CONFIG_ERROR: 'Fix foundry.toml; forge could not read it.',
+  FFI_OVERRIDE_FAILED:
+    'This is a forge-test-mcp bug; please report it. Only the user can choose to run FFI tests, by starting the server with --allow-ffi.',
   SOLC_MISSING:
     'Run `forge build` once in a terminal so forge can install the compiler. This server runs forge with --offline and does not download anything.',
   COMPILE_FAILED:

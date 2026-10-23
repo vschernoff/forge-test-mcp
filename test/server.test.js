@@ -14,7 +14,7 @@ const INSTRUCTIONS_BUDGET = 512
 
 // FR-38: the complete tool list. A tool that could broadcast, deploy, sign or take a key
 // must never appear here; adding any tool means changing this list on purpose.
-const EXPECTED_TOOLS = []
+const EXPECTED_TOOLS = ['run_tests']
 
 function tempDir(depth) {
   let dir = fs.mkdtempSync(path.join(os.tmpdir(), 'forge-test-mcp-server-'))

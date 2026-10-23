@@ -1,0 +1,19 @@
+# Fixture project for forge-test-mcp integration tests (copied from the Phase 1 spike).
+[profile.default]
+src = "src"
+test = "test"
+out = "out"
+libs = ["lib"]
+solc_version = "0.8.37"
+auto_detect_solc = false
+optimizer = false
+ffi = true
+
+[fuzz]
+runs = 256
+seed = "0x5eed"
+
+[invariant]
+runs = 64
+depth = 16
+fail_on_revert = false
