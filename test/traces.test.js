@@ -102,6 +102,12 @@ test('text output without any suite is not a healthy run', () => {
   assert.equal(contradicting.code, 'INCONSISTENT_RESULT')
 })
 
+test('CRLF output parses exactly like LF output', () => {
+  const lf = sample('1.8.6', 'edge-cases').replace(/\r\n/g, '\n')
+  const crlf = lf.replace(/\n/g, '\r\n')
+  assert.deepEqual([...parseTextReport(crlf)], [...parseTextReport(lf)])
+})
+
 test('unknown text never throws; it simply yields no entries', () => {
   assert.equal(parseTextReport('garbage\n[FAIL without anything]\n').size, 0)
   assert.deepEqual(revertPath([]), { lines: [], omitted: 0 })

@@ -29,7 +29,10 @@ const MAX_EXCERPT_LINES = 12
  *   backtrace: string[] }>} keyed by "Contract.signature()" */
 function parseTextReport(text) {
   const tests = new Map()
-  const body = stripAnsi(text).split(/\nFailing tests:\n/)[0]
+  // CRLF from forge on Windows (or a Windows checkout) must parse the same as LF.
+  const body = stripAnsi(text)
+    .replace(/\r\n?/g, '\n')
+    .split(/\nFailing tests:\n/)[0]
   let contract = null
   let entry = null
   let section = null
