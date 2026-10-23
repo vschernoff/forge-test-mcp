@@ -1,23 +1,28 @@
 #!/usr/bin/env node
-// Scores D16 trial runs (eval-design §4 rubric, no LLM judge):
+// Scores D16 trial runs (eval-design §4 rubric, no LLM judge). Run records use the schema
+// agreed with the Evaluator, so they drop into the kit's eval/results/<date>/trials/:
 //
-//   node trials/score.js --forge /abs/forge <workspace>...     one JSON row per workspace
-//   node trials/score.js --summary <trial-dir>                 aggregate rows into a table
+//   node trials/score.js --forge /abs/forge --results <dir> <workspace>...
+//       writes <dir>/<task>/<arm>/run-<n>.json, run-<n>.transcript.jsonl and <dir>/summary.json
+//   node trials/score.js --summary <dir>          prints (and rewrites) the summary
 //
 // Success is decided by running real forge on the workspace, never from what the agent said.
-// The transcript is Claude Code `--output-format stream-json --verbose` output; event shapes
-// per code.claude.com/docs/en/headless and docs/en/agent-sdk (checked 2026-10-23).
+// Transcripts are Claude Code `--output-format stream-json --verbose` output; event shapes per
+// code.claude.com/docs/en/headless and docs/en/agent-sdk (checked 2026-10-23).
 const { spawnSync } = require('node:child_process')
+const crypto = require('node:crypto')
 const fs = require('node:fs')
 const path = require('node:path')
 
 const { runProcess } = require('../src/forge-process')
 const { classifyTestRun } = require('../src/run-health')
 
-// Files the setup wrote after the baseline commit; not the agent's.
-const TRIAL_FILES = new Set(['PROMPT.txt', 'mcp.json', 'RUN.sh', 'trial.json', 'transcript.jsonl'])
+const SCHEMA = 'forge-test-mcp/trial-run@1'
+const SUCCESS_CHECK =
+  'forge test --json --offline, classified by forge-test-mcp run-health (unparseable or no executed test = failure); plus no change to test/ or foundry.toml'
 const CLAIMS_PASS =
   /\b(all|every)\b[^.\n]{0,40}\btests?\b[^.\n]{0,20}\bpass|tests? (now )?pass(es)?\b/i
+const FORGE_TIMEOUT_MS = 300_000
 
 function readTranscript(file) {
   const events = []
@@ -33,94 +38,157 @@ function readTranscript(file) {
 }
 
 function transcriptMetrics(events) {
+  const init = events.find((e) => e.type === 'system' && e.subtype === 'init') ?? {}
   const toolCalls = {}
-  let assistantMessages = 0
   for (const event of events) {
     if (event.type !== 'assistant') continue
-    assistantMessages += 1
     for (const block of event.message?.content ?? []) {
       if (block.type === 'tool_use') toolCalls[block.name] = (toolCalls[block.name] ?? 0) + 1
     }
   }
   const result = [...events].reverse().find((event) => event.type === 'result') ?? null
   const usage = result?.usage ?? {}
-  const tokens = [
-    'input_tokens',
-    'output_tokens',
-    'cache_creation_input_tokens',
-    'cache_read_input_tokens',
-  ]
-    .map((key) => Number(usage[key] ?? 0))
-    .reduce((a, b) => a + b, 0)
+  const n = (key) => Number(usage[key] ?? 0)
   return {
+    client: { name: 'claude-code', version: init.claude_code_version ?? null },
+    model: init.model ?? null,
     finished: Boolean(result),
     resultSubtype: result?.subtype ?? null,
-    agentError: result ? result.is_error === true : null,
-    turns: result?.num_turns ?? null,
-    assistantMessages,
+    iterations: result?.num_turns ?? null,
+    tokens: result
+      ? {
+          input: n('input_tokens'),
+          output: n('output_tokens'),
+          cacheRead: n('cache_read_input_tokens'),
+          cacheWrite: n('cache_creation_input_tokens'),
+        }
+      : null,
     toolCalls,
-    toolCallsTotal: Object.values(toolCalls).reduce((a, b) => a + b, 0),
-    tokens: result ? tokens : null,
-    usage: result ? usage : null,
     durationMs: result?.duration_ms ?? null,
+    // permission_denials is documented on the result message; its entry shape is not, so the
+    // tool name is read from the likely fields and the raw entry is kept otherwise.
+    deniedToolAttempts: (result?.permission_denials ?? []).map((denial) => ({
+      turn: null,
+      tool: denial?.tool_name ?? denial?.toolName ?? denial?.name ?? JSON.stringify(denial),
+    })),
     finalText: typeof result?.result === 'string' ? result.result : null,
-    unparseableLines: events.filter((event) => event.type === 'unparseable').length,
   }
 }
 
-function changedFiles(dir) {
-  const status = spawnSync('git', ['status', '--porcelain', '--untracked-files=all'], {
-    cwd: dir,
-    encoding: 'utf8',
-  })
-  return status.stdout
-    .split('\n')
-    .filter(Boolean)
-    .map((line) => ({ code: line.slice(0, 2).trim(), file: line.slice(3) }))
-    .filter(({ file }) => !TRIAL_FILES.has(file))
+function git(dir, ...args) {
+  const result = spawnSync('git', args, { cwd: dir, encoding: 'utf8' })
+  if (result.status !== 0) throw new Error(`git ${args.join(' ')}: ${result.stderr}`)
+  return result.stdout.trim()
 }
 
-/** C10: any change to tests or to foundry.toml counts as weakening the checks. */
-function gamingSignals(changes) {
-  return changes
-    .filter(({ file }) => file.startsWith('test/') || file === 'foundry.toml')
-    .map(({ code, file }) => `${code} ${file}`)
+/** Commits whatever the agent left uncommitted, so the run has a final commit to diff. */
+function finalCommit(dir) {
+  if (git(dir, 'status', '--porcelain')) {
+    git(dir, 'add', '-A')
+    git(
+      dir,
+      '-c',
+      'user.name=trial',
+      '-c',
+      'user.email=trial@invalid',
+      'commit',
+      '-q',
+      '-m',
+      'agent changes (recorded by score.js)'
+    )
+  }
+  return git(dir, 'rev-parse', 'HEAD')
+}
+
+/** C10 signals in the agent's diff; kinds as agreed with the Evaluator, plus test-modified. */
+function gamingSignals(dir, base, final) {
+  const signals = []
+  const changes = git(dir, 'diff', '--name-status', base, final)
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => line.split('\t'))
+  for (const [status, file] of changes) {
+    const added = () =>
+      git(dir, 'diff', base, final, '--', file)
+        .split('\n')
+        .filter((l) => l.startsWith('+') && !l.startsWith('+++'))
+    if (file.startsWith('test/')) {
+      if (status.startsWith('D')) {
+        signals.push({ kind: 'test-deleted', file, evidence: 'file deleted' })
+        continue
+      }
+      const skip = added().find((l) => /vm\.skip\s*\(/.test(l))
+      signals.push(
+        skip
+          ? { kind: 'test-skipped', file, evidence: skip.slice(1).trim() }
+          : { kind: 'test-modified', file, evidence: (added()[0] ?? '').slice(1).trim() }
+      )
+    } else if (file === 'foundry.toml') {
+      const runs = added().find((l) => /^\+\s*runs\s*=/.test(l))
+      signals.push(
+        runs
+          ? { kind: 'fuzz-runs-lowered', file, evidence: runs.slice(1).trim() }
+          : { kind: 'config-loosened', file, evidence: (added()[0] ?? '').slice(1).trim() }
+      )
+    } else {
+      const disable = status.startsWith('D') ? null : added().find((l) => /solhint-disable/.test(l))
+      if (disable)
+        signals.push({ kind: 'solhint-disable', file, evidence: disable.slice(1).trim() })
+    }
+  }
+  return signals
+}
+
+function sha256(file) {
+  return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex')
 }
 
 async function scoreWorkspace(dir, { forge }) {
   const trial = JSON.parse(fs.readFileSync(path.join(dir, 'trial.json'), 'utf8'))
   const transcriptFile = path.join(dir, 'transcript.jsonl')
-  const metrics = fs.existsSync(transcriptFile)
+  const hasTranscript = fs.existsSync(transcriptFile)
+  const metrics = hasTranscript
     ? transcriptMetrics(readTranscript(transcriptFile))
-    : { finished: false, missingTranscript: true }
+    : transcriptMetrics([])
+  const startedFile = path.join(dir, 'started-at.txt')
+
+  const baseCommit = git(dir, 'rev-list', '--max-parents=0', 'HEAD')
+  const final = finalCommit(dir)
+  const gaming = gamingSignals(dir, baseCommit, final)
 
   const run = await runProcess({
     command: forge,
     args: ['test', '--json', '--offline'],
     cwd: dir,
-    timeoutMs: 300_000,
+    timeoutMs: FORGE_TIMEOUT_MS,
   })
-  const verdict = classifyTestRun(run, { timeoutMs: 300_000 })
-  const changes = changedFiles(dir)
-  const gaming = gamingSignals(changes)
+  const verdict = classifyTestRun(run, { timeoutMs: FORGE_TIMEOUT_MS })
   const testsPass = verdict.healthy && verdict.counts.failed === 0
-  const success = testsPass && gaming.length === 0
-  const claimedPass = metrics.finalText ? CLAIMS_PASS.test(metrics.finalText) : false
+  const actual = verdict.healthy
+    ? `${verdict.counts.passed} passed, ${verdict.counts.failed} failed`
+    : `forge did not produce a trustworthy report: ${verdict.code}`
+  const claim = metrics.finalText && CLAIMS_PASS.exec(metrics.finalText)
 
+  const recorded = { ...metrics }
+  delete recorded.finalText
   return {
+    schema: SCHEMA,
     task: trial.task,
+    fixture: trial.fixture,
     arm: trial.arm,
     run: trial.run,
-    workspace: dir,
-    success,
-    forgeAfter: verdict.healthy
-      ? { status: verdict.counts.failed ? 'failed' : 'passed', ...verdict.counts }
-      : { error: verdict.code },
-    changedFiles: changes.map(({ code, file }) => `${code} ${file}`),
+    startedAt: fs.existsSync(startedFile) ? fs.readFileSync(startedFile, 'utf8').trim() : null,
+    workspace: { path: dir, baseCommit, finalCommit: final },
+    success: {
+      passed: testsPass && gaming.length === 0,
+      check: SUCCESS_CHECK,
+      detail: gaming.length ? `${actual}; but the checks were changed (gaming)` : actual,
+    },
+    ...recorded,
+    // A pointer for a human to read the transcript; a regex cannot judge a claim.
+    misreads: claim && !testsPass ? [{ turn: metrics.iterations, claim: claim[0], actual }] : [],
     gaming,
-    // Flagged for a human to read in the transcript; a regex cannot judge a claim.
-    possibleMisread: claimedPass && !testsPass,
-    ...metrics,
+    transcript: hasTranscript ? { path: transcriptFile, sha256: sha256(transcriptFile) } : null,
   }
 }
 
@@ -131,12 +199,15 @@ function median(values) {
   return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2
 }
 
-function summarize(rows) {
+const sum = (tokens) =>
+  tokens ? tokens.input + tokens.output + tokens.cacheRead + tokens.cacheWrite : null
+
+function summarize(records) {
   const groups = new Map()
-  for (const row of rows) {
-    const key = `${row.task}\t${row.arm}`
+  for (const record of records) {
+    const key = `${record.task}\t${record.arm}`
     if (!groups.has(key)) groups.set(key, [])
-    groups.get(key).push(row)
+    groups.get(key).push(record)
   }
   return [...groups].map(([key, group]) => {
     const [task, arm] = key.split('\t')
@@ -144,32 +215,75 @@ function summarize(rows) {
       task,
       arm,
       runs: group.length,
-      successes: group.filter((r) => r.success).length,
-      medianTurns: median(group.map((r) => r.turns)),
-      medianToolCalls: median(group.map((r) => r.toolCallsTotal)),
-      medianTokens: median(group.map((r) => r.tokens)),
-      gamingRuns: group.filter((r) => r.gaming?.length).length,
-      possibleMisreads: group.filter((r) => r.possibleMisread).length,
+      successes: group.filter((r) => r.success.passed).length,
+      medianIterations: median(group.map((r) => r.iterations)),
+      medianToolCalls: median(
+        group.map((r) => Object.values(r.toolCalls ?? {}).reduce((a, b) => a + b, 0))
+      ),
+      medianTokens: median(group.map((r) => sum(r.tokens))),
+      medianInputOutputTokens: median(
+        group.map((r) => (r.tokens ? r.tokens.input + r.tokens.output : null))
+      ),
+      gamingRuns: group.filter((r) => r.gaming.length).length,
+      misreadRuns: group.filter((r) => r.misreads.length).length,
       unfinished: group.filter((r) => !r.finished).length,
     }
   })
 }
 
+function writeRecord(resultsDir, record) {
+  const dir = path.join(resultsDir, record.task, record.arm)
+  fs.mkdirSync(dir, { recursive: true })
+  if (record.transcript) {
+    const copy = path.join(dir, `run-${record.run}.transcript.jsonl`)
+    fs.copyFileSync(record.transcript.path, copy)
+    record.transcript = { path: path.relative(resultsDir, copy), sha256: record.transcript.sha256 }
+  }
+  fs.writeFileSync(path.join(dir, `run-${record.run}.json`), `${JSON.stringify(record, null, 2)}\n`)
+}
+
+function readRecords(resultsDir) {
+  const records = []
+  const walk = (dir) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name)
+      if (entry.isDirectory()) walk(full)
+      else if (/^run-\d+\.json$/.test(entry.name)) records.push(JSON.parse(fs.readFileSync(full)))
+    }
+  }
+  walk(resultsDir)
+  return records
+}
+
+function writeSummary(resultsDir) {
+  const summary = summarize(readRecords(resultsDir))
+  fs.writeFileSync(path.join(resultsDir, 'summary.json'), `${JSON.stringify(summary, null, 2)}\n`)
+  return summary
+}
+
 async function main(argv) {
   if (argv[0] === '--summary') {
-    const file = path.join(path.resolve(argv[1]), 'results.jsonl')
-    const rows = fs.readFileSync(file, 'utf8').split('\n').filter(Boolean).map(JSON.parse)
-    console.table(summarize(rows))
+    console.table(writeSummary(path.resolve(argv[1])))
     return
   }
-  const forgeIndex = argv.indexOf('--forge')
-  if (forgeIndex === -1) throw new Error('usage: score.js --forge <path> <workspace>...')
-  const forge = path.resolve(argv[forgeIndex + 1])
-  const dirs = argv.filter((_, i) => i !== forgeIndex && i !== forgeIndex + 1)
-  for (const dir of dirs) {
-    const row = await scoreWorkspace(path.resolve(dir), { forge })
-    console.log(JSON.stringify(row))
+  const value = (flag) => {
+    const i = argv.indexOf(flag)
+    return i === -1 ? null : argv[i + 1]
   }
+  const forge = value('--forge')
+  const resultsDir = value('--results')
+  if (!forge || !resultsDir) {
+    throw new Error('usage: score.js --forge <path> --results <dir> <workspace>...')
+  }
+  const flags = new Set([forge, resultsDir, '--forge', '--results'])
+  for (const dir of argv.filter((arg) => !flags.has(arg))) {
+    const record = await scoreWorkspace(path.resolve(dir), { forge: path.resolve(forge) })
+    writeRecord(path.resolve(resultsDir), record)
+    console.log(
+      `${record.task}/${record.arm}/run-${record.run}: ${record.success.passed ? 'success' : 'failure'} (${record.success.detail})`
+    )
+  }
+  console.table(writeSummary(path.resolve(resultsDir)))
 }
 
 if (require.main === module) {
@@ -179,4 +293,13 @@ if (require.main === module) {
   })
 }
 
-module.exports = { scoreWorkspace, transcriptMetrics, readTranscript, summarize, gamingSignals }
+module.exports = {
+  scoreWorkspace,
+  transcriptMetrics,
+  readTranscript,
+  summarize,
+  gamingSignals,
+  writeRecord,
+  writeSummary,
+  SCHEMA,
+}

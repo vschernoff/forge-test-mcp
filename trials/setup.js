@@ -44,6 +44,7 @@ function runScript({ arm, maxTurns }) {
 # used, and --bare is not used (it ignores the login). Writes transcript.jsonl next to this file.
 set -eu
 cd "$(dirname "$0")"
+date -u +%Y-%m-%dT%H:%M:%SZ > started-at.txt
 env -u ANTHROPIC_API_KEY claude -p "$(cat PROMPT.txt)" \\
   --output-format stream-json --verbose \\
   --permission-mode acceptEdits \\
@@ -72,7 +73,11 @@ async function setup({ forge, out, runs, build }) {
           // The compile-error fixture fails this build, which is expected.
           spawnSync(forge, ['build'], { cwd: dir, stdio: 'ignore' })
         }
-        fs.writeFileSync(path.join(dir, '.gitignore'), 'out/\ncache/\nlib/\ntranscript.jsonl\n')
+        // The trial's own files are never part of the agent's diff.
+        fs.writeFileSync(
+          path.join(dir, '.gitignore'),
+          'out/\ncache/\nlib/\nPROMPT.txt\nmcp.json\nRUN.sh\ntrial.json\ntranscript.jsonl\nstarted-at.txt\n'
+        )
         git(dir, 'init', '-q')
         git(dir, 'add', '-A')
         git(
@@ -86,10 +91,9 @@ async function setup({ forge, out, runs, build }) {
           '-m',
           'baseline'
         )
-        // Written after the baseline so score.js sees only the agent's own changes.
         fs.writeFileSync(path.join(dir, 'PROMPT.txt'), `${task.prompt} ${arm.toolSentence}\n`)
         const servers =
-          armName === 'mcp'
+          armName === 'A-tool'
             ? {
                 'forge-test': {
                   command: process.execPath,
@@ -105,7 +109,7 @@ async function setup({ forge, out, runs, build }) {
         fs.chmodSync(path.join(dir, 'RUN.sh'), 0o755)
         fs.writeFileSync(
           path.join(dir, 'trial.json'),
-          `${JSON.stringify({ task: task.id, arm: armName, run, forge }, null, 2)}\n`
+          `${JSON.stringify({ task: task.id, fixture: task.evalFixture, arm: armName, run, forge }, null, 2)}\n`
         )
         created.push(dir)
       }

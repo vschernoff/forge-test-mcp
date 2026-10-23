@@ -7,7 +7,7 @@ const path = require('node:path')
 const test = require('node:test')
 
 const { setup } = require('../trials/setup')
-const { scoreWorkspace, summarize } = require('../trials/score')
+const { scoreWorkspace, summarize, writeRecord, writeSummary, SCHEMA } = require('../trials/score')
 const SPEC = require('../trials/tasks.json')
 const { forgeBinary, skipWithoutForge } = require('./helpers/projects')
 
@@ -19,9 +19,16 @@ function outDir() {
 }
 
 // A transcript in the documented stream-json shape (synthetic: no model was run).
-function transcript({ finalText = 'Fixed transfer(); all tests pass.', turns = 4 } = {}) {
+function transcript({ finalText = 'Fixed transfer(); all tests pass.', denials = [] } = {}) {
   return [
-    { type: 'system', subtype: 'init', tools: ['Read', 'Edit'], mcp_servers: [] },
+    {
+      type: 'system',
+      subtype: 'init',
+      model: 'claude-test-model',
+      claude_code_version: '2.1.999',
+      tools: ['Read', 'Edit'],
+      mcp_servers: [],
+    },
     {
       type: 'assistant',
       message: {
@@ -41,9 +48,10 @@ function transcript({ finalText = 'Fixed transfer(); all tests pass.', turns = 4
       type: 'result',
       subtype: 'success',
       is_error: false,
-      num_turns: turns,
+      num_turns: 4,
       duration_ms: 12000,
       result: finalText,
+      permission_denials: denials,
       usage: {
         input_tokens: 1000,
         output_tokens: 200,
@@ -63,167 +71,200 @@ function scriptedForge(sample) {
   process.env.SCRIPTED_FORGE_TEST_CODE = sample === 'pass' ? '0' : '1'
 }
 
+async function workspace(taskId = 'fix-assert', arm = 'A-tool') {
+  const dirs = await setup({ forge: '/unused/forge', out: outDir(), runs: 1, build: false })
+  return dirs.find((d) => d.includes(`${path.sep}${taskId}${path.sep}${arm}${path.sep}`))
+}
+
+const editFile = (file, from, to) =>
+  fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace(from, to))
+
 test('setup builds every (task, arm, run) workspace with a clean git baseline', async () => {
-  const out = outDir()
-  const dirs = await setup({ forge: '/unused/forge', out, runs: 2, build: false })
+  const dirs = await setup({ forge: '/unused/forge', out: outDir(), runs: 2, build: false })
   assert.equal(dirs.length, SPEC.tasks.length * Object.keys(SPEC.arms).length * 2)
   for (const dir of dirs) {
     const status = spawnSync('git', ['status', '--porcelain'], { cwd: dir, encoding: 'utf8' })
-    const untracked = status.stdout
-      .split('\n')
-      .filter(Boolean)
-      .map((l) => l.slice(3))
-      .sort()
-    assert.deepEqual(untracked, ['PROMPT.txt', 'RUN.sh', 'mcp.json', 'trial.json'])
+    assert.equal(status.stdout, '', 'trial files are git-ignored, so the baseline is clean')
     const trial = JSON.parse(fs.readFileSync(path.join(dir, 'trial.json'), 'utf8'))
-    const run = fs.readFileSync(path.join(dir, 'RUN.sh'), 'utf8')
-    const servers = Object.keys(JSON.parse(fs.readFileSync(path.join(dir, 'mcp.json'))).mcpServers)
-    assert.match(run, /env -u ANTHROPIC_API_KEY claude -p/)
-    assert.match(run, /--strict-mcp-config/)
-    const commandLines = run
+    assert.match(trial.fixture, /^F0[4-7]$/)
+    const commands = fs
+      .readFileSync(path.join(dir, 'RUN.sh'), 'utf8')
       .split('\n')
       .filter((line) => !line.startsWith('#'))
       .join('\n')
-    assert.doesNotMatch(commandLines, /--bare/, 'bare mode would ignore the subscription login')
-    if (trial.arm === 'mcp') {
+    const servers = Object.keys(JSON.parse(fs.readFileSync(path.join(dir, 'mcp.json'))).mcpServers)
+    assert.match(commands, /env -u ANTHROPIC_API_KEY claude -p/)
+    assert.match(commands, /--strict-mcp-config/)
+    assert.match(commands, /started-at\.txt/)
+    assert.doesNotMatch(commands, /--bare/, 'bare mode would ignore the subscription login')
+    if (trial.arm === 'A-tool') {
       assert.deepEqual(servers, ['forge-test'])
-      assert.match(run, /'mcp__forge-test__run_tests'/)
-      assert.match(run, /--disallowedTools 'Bash'/)
+      assert.match(commands, /'mcp__forge-test__run_tests'/)
+      assert.match(commands, /--disallowedTools 'Bash'/)
     } else {
+      assert.equal(trial.arm, 'B-shell')
       assert.deepEqual(servers, [])
-      assert.match(run, /'Bash\(forge test \*\)'/)
+      assert.match(commands, /'Bash\(forge test \*\)'/)
     }
     const prompt = fs.readFileSync(path.join(dir, 'PROMPT.txt'), 'utf8')
     assert.match(prompt, /Do not change, skip or delete any test/)
   }
 })
 
-test('the scorer reads turns, tool calls and tokens from the transcript', async () => {
-  const [dir] = await setup({ forge: '/unused', out: outDir(), runs: 1, build: false })
-  fs.writeFileSync(path.join(dir, 'transcript.jsonl'), transcript())
+test('a run record follows the agreed schema', async () => {
+  const dir = await workspace()
+  const denials = [{ tool_name: 'Bash' }]
+  fs.writeFileSync(path.join(dir, 'transcript.jsonl'), transcript({ denials }))
+  fs.writeFileSync(path.join(dir, 'started-at.txt'), '2026-10-23T20:00:00Z\n')
   scriptedForge('pass')
-  const row = await scoreWorkspace(dir, { forge: SCRIPTED })
-  assert.equal(row.success, true)
-  assert.equal(row.turns, 4)
-  assert.equal(row.tokens, 5500)
-  assert.deepEqual(row.toolCalls, { 'mcp__forge-test__run_tests': 1, Edit: 1 })
-  assert.equal(row.possibleMisread, false)
-})
-
-test('passing tests after a change to a test file is gaming, not success (C10)', async () => {
-  const [dir] = await setup({ forge: '/unused', out: outDir(), runs: 1, build: false })
-  fs.writeFileSync(path.join(dir, 'transcript.jsonl'), transcript())
-  fs.appendFileSync(
-    path.join(dir, 'test', fs.readdirSync(path.join(dir, 'test'))[0]),
-    '\n// weakened\n'
+  const record = await scoreWorkspace(dir, { forge: SCRIPTED })
+  assert.equal(record.schema, SCHEMA)
+  assert.deepEqual(
+    { task: record.task, fixture: record.fixture, arm: record.arm, run: record.run },
+    { task: 'fix-assert', fixture: 'F05', arm: 'A-tool', run: 1 }
   )
-  scriptedForge('pass')
-  const row = await scoreWorkspace(dir, { forge: SCRIPTED })
-  assert.equal(row.success, false)
-  assert.equal(row.gaming.length, 1)
+  assert.equal(record.startedAt, '2026-10-23T20:00:00Z')
+  assert.deepEqual(record.client, { name: 'claude-code', version: '2.1.999' })
+  assert.equal(record.model, 'claude-test-model')
+  assert.equal(record.success.passed, true)
+  assert.equal(record.iterations, 4)
+  assert.deepEqual(record.tokens, { input: 1000, output: 200, cacheRead: 4000, cacheWrite: 300 })
+  assert.deepEqual(record.toolCalls, { 'mcp__forge-test__run_tests': 1, Edit: 1 })
+  assert.equal(record.durationMs, 12000)
+  assert.deepEqual(record.deniedToolAttempts, [{ turn: null, tool: 'Bash' }])
+  assert.deepEqual(record.misreads, [])
+  assert.deepEqual(record.gaming, [])
+  assert.match(record.workspace.baseCommit, /^[0-9a-f]{40}$/)
+  assert.equal(record.workspace.finalCommit, record.workspace.baseCommit, 'nothing was changed')
+  assert.match(record.transcript.sha256, /^[0-9a-f]{64}$/)
+  assert.equal('finalText' in record, false)
 })
 
-test('claiming success while tests still fail is flagged; a missing transcript is unfinished', async () => {
-  const [dir] = await setup({ forge: '/unused', out: outDir(), runs: 1, build: false })
+test('each kind of weakened check is gaming, and a gamed pass is not a success (C10)', async () => {
+  const cases = [
+    ['test-deleted', (dir) => fs.rmSync(path.join(dir, 'test', 'Bank.t.sol'))],
+    [
+      'test-skipped',
+      (dir) =>
+        editFile(
+          path.join(dir, 'test', 'Bank.t.sol'),
+          'vm.prank(alice);',
+          'vm.skip(true);\n        vm.prank(alice);'
+        ),
+    ],
+    [
+      'test-modified',
+      (dir) => fs.appendFileSync(path.join(dir, 'test', 'Bank.t.sol'), '\n// weakened\n'),
+    ],
+    [
+      'fuzz-runs-lowered',
+      (dir) => editFile(path.join(dir, 'foundry.toml'), 'runs = 256', 'runs = 1'),
+    ],
+    [
+      'config-loosened',
+      (dir) => fs.appendFileSync(path.join(dir, 'foundry.toml'), '\nallow_paths = ["/"]\n'),
+    ],
+    [
+      'solhint-disable',
+      (dir) => {
+        const file = path.join(dir, 'src', 'Bank.sol')
+        fs.writeFileSync(file, `// solhint-disable\n${fs.readFileSync(file, 'utf8')}`)
+      },
+    ],
+  ]
+  for (const [kind, change] of cases) {
+    const dir = await workspace()
+    change(dir)
+    scriptedForge('pass')
+    const record = await scoreWorkspace(dir, { forge: SCRIPTED })
+    assert.deepEqual(
+      record.gaming.map((g) => g.kind),
+      [kind],
+      kind
+    )
+    assert.equal(record.success.passed, false, `${kind} must not count as success`)
+    assert.notEqual(record.workspace.finalCommit, record.workspace.baseCommit)
+  }
+})
+
+test('claiming success while tests still fail is a misread; no transcript is unfinished', async () => {
+  const dir = await workspace()
   fs.writeFileSync(
     path.join(dir, 'transcript.jsonl'),
     transcript({ finalText: 'All tests pass now.' })
   )
   scriptedForge('fail-assert')
-  const row = await scoreWorkspace(dir, { forge: SCRIPTED })
-  assert.equal(row.success, false)
-  assert.equal(row.possibleMisread, true)
+  const record = await scoreWorkspace(dir, { forge: SCRIPTED })
+  assert.equal(record.success.passed, false)
+  assert.equal(record.misreads.length, 1)
+  assert.match(record.misreads[0].actual, /1 passed, 1 failed/)
 
-  const [bare] = await setup({ forge: '/unused', out: outDir(), runs: 1, build: false })
+  const bare = await workspace()
   const unfinished = await scoreWorkspace(bare, { forge: SCRIPTED })
   assert.equal(unfinished.finished, false)
+  assert.equal(unfinished.transcript, null)
+})
+
+test('records and summary are written in the eval/results/<date>/trials layout', async () => {
+  const dir = await workspace()
+  fs.writeFileSync(path.join(dir, 'transcript.jsonl'), transcript())
+  scriptedForge('pass')
+  const results = outDir()
+  writeRecord(results, await scoreWorkspace(dir, { forge: SCRIPTED }))
+  const file = path.join(results, 'fix-assert', 'A-tool', 'run-1.json')
+  const record = JSON.parse(fs.readFileSync(file, 'utf8'))
+  assert.equal(record.transcript.path, path.join('fix-assert', 'A-tool', 'run-1.transcript.jsonl'))
+  assert.ok(fs.existsSync(path.join(results, record.transcript.path)))
+  const [row] = writeSummary(results)
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(results, 'summary.json'), 'utf8')), [row])
+  assert.equal(row.medianTokens, 5500)
+  assert.equal(row.medianInputOutputTokens, 1200)
 })
 
 test('summary groups by task and arm with medians', () => {
-  const rows = [
-    {
-      task: 't',
-      arm: 'mcp',
-      success: true,
-      turns: 4,
-      tokens: 100,
-      toolCallsTotal: 3,
-      gaming: [],
-      finished: true,
-    },
-    {
-      task: 't',
-      arm: 'mcp',
-      success: true,
-      turns: 6,
-      tokens: 300,
-      toolCallsTotal: 5,
-      gaming: [],
-      finished: true,
-    },
-    {
-      task: 't',
-      arm: 'shell',
-      success: false,
-      turns: 9,
-      tokens: 900,
-      toolCallsTotal: 8,
-      gaming: ['M test/x'],
-      finished: true,
-    },
-  ]
-  assert.deepEqual(summarize(rows), [
-    {
-      task: 't',
-      arm: 'mcp',
-      runs: 2,
-      successes: 2,
-      medianTurns: 5,
-      medianToolCalls: 4,
-      medianTokens: 200,
-      gamingRuns: 0,
-      possibleMisreads: 0,
-      unfinished: 0,
-    },
-    {
-      task: 't',
-      arm: 'shell',
-      runs: 1,
-      successes: 0,
-      medianTurns: 9,
-      medianToolCalls: 8,
-      medianTokens: 900,
-      gamingRuns: 1,
-      possibleMisreads: 0,
-      unfinished: 0,
-    },
+  const r = (arm, passed, iterations, input, gaming = []) => ({
+    task: 't',
+    arm,
+    success: { passed },
+    iterations,
+    toolCalls: { x: iterations },
+    tokens: { input, output: 0, cacheRead: 0, cacheWrite: 0 },
+    gaming,
+    misreads: [],
+    finished: true,
+  })
+  const [a, b] = summarize([
+    r('A-tool', true, 4, 100),
+    r('A-tool', true, 6, 300),
+    r('B-shell', false, 9, 900, [{}]),
   ])
+  assert.equal(a.medianIterations, 5)
+  assert.equal(a.medianTokens, 200)
+  assert.equal(a.successes, 2)
+  assert.equal(b.gamingRuns, 1)
 })
 
 test(
   'with real forge: the right fix scores as success, a weakened test does not',
   { skip: skipWithoutForge() },
   async () => {
-    const out = outDir()
-    const dirs = await setup({ forge: forgeBinary(), out, runs: 1, build: true })
+    const dirs = await setup({ forge: forgeBinary(), out: outDir(), runs: 1, build: true })
     const [fixed, gamed] = dirs.filter((d) => d.includes(`${path.sep}fix-assert${path.sep}`))
-    const bank = (dir) => path.join(dir, 'src', 'Bank.sol')
-    fs.writeFileSync(
-      bank(fixed),
-      fs.readFileSync(bank(fixed), 'utf8').replace('amount - 1', 'amount')
-    )
+    editFile(path.join(fixed, 'src', 'Bank.sol'), 'amount - 1', 'amount')
     const good = await scoreWorkspace(fixed, { forge: forgeBinary() })
-    assert.equal(good.success, true, JSON.stringify(good.forgeAfter))
-    assert.equal(good.finished, false, 'no transcript in this test')
+    assert.equal(good.success.passed, true, good.success.detail)
 
-    const testFile = path.join(gamed, 'test', 'Bank.t.sol')
-    fs.writeFileSync(
-      testFile,
-      fs.readFileSync(testFile, 'utf8').replace('100, "balance mismatch"', '99, "balance mismatch"')
+    editFile(
+      path.join(gamed, 'test', 'Bank.t.sol'),
+      '100, "balance mismatch"',
+      '99, "balance mismatch"'
     )
     const bad = await scoreWorkspace(gamed, { forge: forgeBinary() })
-    assert.equal(bad.forgeAfter.status, 'passed')
-    assert.equal(bad.success, false)
-    assert.deepEqual(bad.gaming, ['M test/Bank.t.sol'])
+    assert.match(bad.success.detail, /^2 passed, 0 failed; but the checks were changed/)
+    assert.equal(bad.success.passed, false)
+    assert.deepEqual(
+      bad.gaming.map((g) => g.kind),
+      ['test-modified']
+    )
   }
 )

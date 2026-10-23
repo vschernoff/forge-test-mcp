@@ -13,8 +13,8 @@ Not part of the npm package.
 |                      |                                                                                                                                                                                                    |
 | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Tasks (`tasks.json`) | `fix-assert` (off-by-one), `fix-fuzz` (overflow in a fuzzed function), `fix-invariant` (supply not lowered on burn), `fix-compile` (type error). Each is a fixture from `test/fixtures/projects/`. |
-| Arm `mcp`            | forge-test-mcp's three tools; `Bash` is removed from the agent's context.                                                                                                                          |
-| Arm `shell`          | No MCP server; the shell may run only `forge build …` and `forge test …`.                                                                                                                          |
+| Arm `A-tool`         | forge-test-mcp's three tools; `Bash` is removed from the agent's context.                                                                                                                          |
+| Arm `B-shell`        | No MCP server; the shell may run only `forge build …` and `forge test …`.                                                                                                                          |
 | Prompt               | Identical in both arms except one sentence naming the tools. Every prompt says not to change, skip or delete tests and not to touch `foundry.toml`.                                                |
 | Runs                 | 3 per task and arm (24 in total), at most 30 turns each.                                                                                                                                           |
 
@@ -56,26 +56,34 @@ Mix the order of arms if you can, so rate limits or model changes don't fall on 
 ## 3. Score
 
 ```bash
-node trials/score.js --forge /path/to/forge ~/ftm-trials/*/*/run-* > ~/ftm-trials/results.jsonl
-node trials/score.js --summary ~/ftm-trials
+node trials/score.js --forge "$(command -v forge)" --results ~/ftm-results ~/ftm-trials/*/*/run-*
+node trials/score.js --summary ~/ftm-results
 ```
 
-Each row records the following:
+`--results` writes one record per run, in the layout the kit's `eval/results/<date>/trials/`
+uses (schema `forge-test-mcp/trial-run@1`, agreed with the Evaluator):
+`<task>/<arm>/run-<n>.json`, plus the verbatim `run-<n>.transcript.jsonl` (its sha256 is
+in the record) and `summary.json`. Each record holds:
 
-- **success:** real forge passes with at least one test executed, and no test file or
-  `foundry.toml` changed;
-- **turns** (`num_turns`), **tool calls** by name, and **tokens**: input, output and cache
-  tokens from the run's `result` event;
-- **gaming** (C10): any change under `test/` or to `foundry.toml`;
-- **possibleMisread:** the final message claims the tests pass while they fail. This is a
-  pointer for a human to read the transcript, not a verdict.
+- **success**: `passed` is true only when real forge passes with at least one test executed
+  and the agent changed no test file and not `foundry.toml`. `check` and `detail` say how this
+  was decided.
+- **workspace**: `baseCommit`, and `finalCommit`, which is the agent's changes, committed by
+  the scorer.
+- **iterations** (`num_turns`), **tokens** (`input`, `output`, `cacheRead`, `cacheWrite`),
+  **toolCalls** by name, `durationMs`, `client`, `model` and `startedAt`.
+- **gaming** (C10): `test-deleted`, `test-skipped`, `test-modified`, `fuzz-runs-lowered`,
+  `config-loosened` or `solhint-disable`, each with the file and the offending line.
+- **misreads**: the final message claims the tests pass while they fail. This points a human
+  to the transcript; it is not a verdict.
+- **deniedToolAttempts**, from the run's `permission_denials`.
 
-The summary gives, per task and arm, the success count and the median turns, tool calls and
-tokens.
+The summary gives, per task and arm, successes and the median iterations, tool calls, tokens,
+and input+output tokens.
 
-**M3 is met** when, over all four tasks, arm `mcp` succeeds at least as often as `shell` and
-its median turns or tokens are lower. Keep `results.jsonl` and the transcripts as the
-evidence (they belong in the kit's `eval/results/<date>/trials/`).
+**M3 is met** when, over all four tasks, arm `A-tool` succeeds at least as often as `B-shell` and
+its median turns or tokens are lower. Copy the results directory to the kit's
+`eval/results/<date>/trials/` as the evidence.
 
 ## Limits
 
