@@ -1,0 +1,98 @@
+name: Docker
+
+# The Dockerfile is what Glama's automated checks build before a server is indexed. Building it
+# proves little on its own, so the image is run against a real Foundry project and driven over
+# MCP: the pinned forge inside it must actually run the tests. One Linux job (D25).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || format('run-{0}', github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build the image
+        run: DOCKER_BUILDKIT=1 docker build -t forge-test-mcp:ci .
+
+      - name: Image size and forge version
+        run: |
+          docker image inspect forge-test-mcp:ci --format 'image size {{.Size}} bytes'
+          docker run --rm --entrypoint forge forge-test-mcp:ci --version
+
+      # No forge-std, so the project needs nothing from the network but solc.
+      - name: Create a Foundry project with one passing and one failing test
+        run: |
+          mkdir -p fixture/src fixture/test
+          cat > fixture/foundry.toml <<'EOF'
+          [profile.default]
+          solc_version = "0.8.30"
+          auto_detect_solc = false
+          EOF
+          cat > fixture/test/Smoke.t.sol <<'EOF'
+          // SPDX-License-Identifier: MIT
+          pragma solidity 0.8.30;
+
+          contract SmokeTest {
+              function test_passes() public pure {}
+
+              function test_fails() public pure {
+                  require(1 + 1 == 3, "arithmetic is broken");
+              }
+          }
+          EOF
+          git -C fixture init -q
+
+      - name: Install solc once, as a user would
+        run: |
+          docker run --rm --user "$(id -u):$(id -g)" -v "$PWD/fixture":/project \
+            -v forge-test-mcp-cache:/cache --entrypoint forge forge-test-mcp:ci build
+
+      - name: Speak MCP to the container
+        run: |
+          {
+            echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"ci","version":"1"}}}'
+            echo '{"jsonrpc":"2.0","method":"notifications/initialized"}'
+            echo '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}'
+            echo '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"run_tests","arguments":{"traces":false}}}'
+            sleep 30
+          } | docker run -i --rm --user "$(id -u):$(id -g)" -v "$PWD/fixture":/project \
+                -v forge-test-mcp-cache:/cache forge-test-mcp:ci > out.jsonl
+
+          echo "--- container output ---"
+          cat out.jsonl
+
+          node -e '
+            const lines = require("fs").readFileSync("out.jsonl", "utf8").split("\n").filter(Boolean)
+            const msgs = lines.map((l) => JSON.parse(l)) // any non-JSON line on stdout fails here (FR-40)
+
+            const init = msgs.find((m) => m.id === 1)
+            if (init?.result?.serverInfo?.name !== "forge-test-mcp") throw new Error("no serverInfo")
+
+            const tools = msgs.find((m) => m.id === 2)?.result?.tools?.map((t) => t.name).sort()
+            if (JSON.stringify(tools) !== JSON.stringify(["build", "explain_failure", "run_tests"])) {
+              throw new Error(`unexpected tools: ${tools}`)
+            }
+
+            const call = msgs.find((m) => m.id === 3)?.result
+            if (!call || call.isError) throw new Error("run_tests failed: " + JSON.stringify(call))
+            const report = JSON.parse(call.content[0].text)
+            const f = report.failures?.[0]
+            if (report.status !== "failed" || report.summary.passed !== 1 || report.summary.failed !== 1 ||
+                f?.test !== "SmokeTest.test_fails()" || f?.reason !== "arithmetic is broken") {
+              throw new Error("unexpected report: " + JSON.stringify(report))
+            }
+            console.log(`forge ${report.forge}: ${report.summary.passed} passed, ${report.summary.failed} failed (${f.reason})`)
+            console.log("The container speaks MCP and runs a mounted project with its own forge.")
+          '

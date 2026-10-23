@@ -52,6 +52,22 @@ Pin an exact version. Client shortcuts, from each vendor's documentation (checke
   args = ["-y", "forge-test-mcp@<version>"]
   ```
 
+### Docker
+
+The image contains the server and forge 1.8.6 (the official static Alpine build, checked
+against the release's provenance digests during the build). Mount the project at `/project`
+and a cache volume at `/cache`, where forge keeps the compiler:
+
+```bash
+docker build -t forge-test-mcp .
+docker run --rm -v "$PWD":/project -v forge-test-mcp-cache:/cache --entrypoint forge forge-test-mcp build
+```
+
+The second command installs the project's solc once, online. Then configure the client to run
+`docker` with `["run", "-i", "--rm", "-v", "<project>:/project", "-v",
+"forge-test-mcp-cache:/cache", "forge-test-mcp"]`. forge writes `out/` and `cache/` into the
+project, so on Linux add `--user "$(id -u):$(id -g)"` to both commands.
+
 ### Options
 
 Options go after the package name in `args`. Only the user sets them; no tool argument can.
