@@ -6,10 +6,8 @@ const fs = require('node:fs')
 const scenario = process.env.FAKE_FORGE_SCENARIO ?? 'echo'
 const args = process.argv.slice(2)
 
-function startGrandchild() {
-  const grandchild = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], {
-    stdio: 'ignore',
-  })
+function startGrandchild(stdio = 'ignore') {
+  const grandchild = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio })
   fs.writeFileSync(process.env.FAKE_FORGE_PIDFILE, String(grandchild.pid))
 }
 
@@ -30,6 +28,16 @@ switch (scenario) {
     process.stdout.write('{}')
     // Exit while the grandchild keeps running, with its stdio detached from ours.
     process.exit(0)
+    break
+  case 'exit-with-stdout-holder':
+    // A descendant that inherits forge's stdout keeps the pipe open after forge exits.
+    startGrandchild(['ignore', 'inherit', 'inherit'])
+    process.stdout.write('{}', () => process.exit(0))
+    break
+  case 'ignore-sigterm':
+    fs.writeFileSync(process.env.FAKE_FORGE_PIDFILE, String(process.pid))
+    process.on('SIGTERM', () => {})
+    setInterval(() => {}, 1000)
     break
   case 'flood': {
     const chunk = Buffer.alloc(64 * 1024, 'x')

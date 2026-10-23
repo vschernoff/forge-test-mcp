@@ -4,6 +4,9 @@ const { spawn, spawnSync } = require('node:child_process')
 // large project can print far more. Beyond this the run is reported, never silently cut.
 const DEFAULT_MAX_OUTPUT_BYTES = 256 * 1024 * 1024
 const KILL_GRACE_MS = 2000
+// After forge exits, how long its stdio may stay open (held by a descendant) before the group is
+// swept and the pipes are closed, so a lingering process cannot hold the result back.
+const EXIT_DRAIN_MS = 2000
 const IS_WINDOWS = process.platform === 'win32'
 
 const active = new Set()
@@ -75,10 +78,16 @@ function runProcess({
     let spawnError = null
     let settled = false
     let graceTimer = null
+    let drainTimer = null
 
+    // Signals go to the whole group even when forge itself has already exited: a descendant
+    // can outlive it and keep the pipes open.
     const stop = () => {
-      killTree(child, 'SIGTERM')
-      graceTimer = setTimeout(() => killTree(child, 'SIGKILL'), KILL_GRACE_MS)
+      killTree(child, 'SIGTERM', { evenIfExited: true })
+      graceTimer = setTimeout(
+        () => killTree(child, 'SIGKILL', { evenIfExited: true }),
+        KILL_GRACE_MS
+      )
     }
     const collect = (sink) => (chunk) => {
       if (outputTruncated) return
@@ -103,6 +112,7 @@ function runProcess({
       settled = true
       clearTimeout(timer)
       clearTimeout(graceTimer)
+      clearTimeout(drainTimer)
       active.delete(child)
       // forge has exited; make sure nothing it started outlives it.
       if (!spawnError && child.pid) killTree(child, 'SIGKILL', { evenIfExited: true })
@@ -120,6 +130,15 @@ function runProcess({
     child.on('error', (error) => {
       spawnError = error
       finish(null, null)
+    })
+    child.on('exit', () => {
+      drainTimer = setTimeout(() => {
+        killTree(child, 'SIGKILL', { evenIfExited: true })
+        // On Windows the tree cannot be found after its root exits; closing the pipes still
+        // lets the result through.
+        child.stdout.destroy()
+        child.stderr.destroy()
+      }, EXIT_DRAIN_MS)
     })
     child.on('close', finish)
   })

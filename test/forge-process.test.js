@@ -104,3 +104,33 @@ test('stops and flags output beyond the cap instead of buffering it all', async 
   assert.equal(result.outputTruncated, true)
   assert.ok(result.stdout.length <= 1024 * 1024)
 })
+
+test('returns promptly when forge exits but a descendant holds its stdout open (FR-37)', async () => {
+  const pidFile = path.join(tempDir(), 'grandchild.pid')
+  const started = Date.now()
+  const result = await run('exit-with-stdout-holder', {
+    timeoutMs: 60_000,
+    env: { FAKE_FORGE_PIDFILE: pidFile },
+  })
+  const elapsed = Date.now() - started
+  assert.equal(result.code, 0)
+  assert.equal(result.timedOut, false)
+  assert.equal(result.stdout, '{}')
+  assert.ok(elapsed < 15_000, `took ${elapsed} ms`)
+  const grandchild = Number(fs.readFileSync(pidFile, 'utf8'))
+  assert.ok(await waitUntilDead(grandchild), `descendant ${grandchild} survived`)
+})
+
+test('escalates to SIGKILL when forge ignores SIGTERM on timeout (FR-37)', async () => {
+  const pidFile = path.join(tempDir(), 'forge.pid')
+  const started = Date.now()
+  const result = await run('ignore-sigterm', {
+    timeoutMs: 1000,
+    env: { FAKE_FORGE_PIDFILE: pidFile },
+  })
+  const elapsed = Date.now() - started
+  assert.equal(result.timedOut, true)
+  assert.ok(elapsed < 15_000, `took ${elapsed} ms`)
+  const forge = Number(fs.readFileSync(pidFile, 'utf8'))
+  assert.ok(await waitUntilDead(forge), `forge ${forge} survived SIGKILL escalation`)
+})
