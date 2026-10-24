@@ -370,19 +370,26 @@ contract FfiAgentTest is Test {
   }
 )
 
-test('RUN.sh puts the chosen forge first on PATH, so the shell arm runs that forge', async () => {
-  const fakeBin = tempDir('ftm-forge-bin-')
-  const forge = path.join(fakeBin, 'forge')
-  fs.writeFileSync(forge, '#!/bin/sh\necho fake-forge "$@"\n')
-  fs.chmodSync(forge, 0o755)
-  const [dir] = await setup({ forge, out: outDir(), runs: 1, build: false })
-  const run = fs.readFileSync(path.join(dir, 'RUN.sh'), 'utf8')
-  // Execute the script's own PATH line, then resolve `forge` by name as the shell arm would.
-  const exportLine = run.split('\n').find((line) => line.startsWith('export PATH='))
-  assert.ok(exportLine, 'RUN.sh exports PATH')
-  const resolved = spawnSync('sh', ['-c', `${exportLine}\ncommand -v forge`], {
-    encoding: 'utf8',
-    env: { PATH: '/usr/bin:/bin' },
-  })
-  assert.equal(resolved.stdout.trim(), forge)
-})
+test(
+  'RUN.sh puts the chosen forge first on PATH, so the shell arm runs that forge',
+  {
+    skip:
+      process.platform === 'win32' && 'RUN.sh is a POSIX sh script; trials run on macOS and Linux',
+  },
+  async () => {
+    const fakeBin = tempDir('ftm-forge-bin-')
+    const forge = path.join(fakeBin, 'forge')
+    fs.writeFileSync(forge, '#!/bin/sh\necho fake-forge "$@"\n')
+    fs.chmodSync(forge, 0o755)
+    const [dir] = await setup({ forge, out: outDir(), runs: 1, build: false })
+    const run = fs.readFileSync(path.join(dir, 'RUN.sh'), 'utf8')
+    // Execute the script's own PATH line, then resolve `forge` by name as the shell arm would.
+    const exportLine = run.split('\n').find((line) => line.startsWith('export PATH='))
+    assert.ok(exportLine, 'RUN.sh exports PATH')
+    const resolved = spawnSync('sh', ['-c', `${exportLine}\ncommand -v forge`], {
+      encoding: 'utf8',
+      env: { PATH: '/usr/bin:/bin' },
+    })
+    assert.equal(resolved.stdout.trim(), forge)
+  }
+)
