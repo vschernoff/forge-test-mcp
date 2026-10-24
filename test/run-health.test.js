@@ -6,8 +6,8 @@ const test = require('node:test')
 const { classifyTestRun, HINTS } = require('../src/run-health')
 const { errorResult } = require('../src/tool-result')
 
-// Real `forge test` outputs recorded from forge 1.8.5 and 1.8.6 in the Phase 1 spike
-// (forge-test-mcp-spike/scripts/record-samples.mjs). Local paths are replaced by placeholders.
+// Real `forge test` outputs recorded from forge 1.8.5 and 1.8.6 on the fixture projects.
+// Local paths are replaced by placeholders.
 const SAMPLES_DIR = path.join(__dirname, 'fixtures', 'forge-samples')
 
 const EXPECTED = {
@@ -111,7 +111,7 @@ test('timeout, truncation and spawn failures are errors even if output looks cle
 })
 
 test('forge 1.7-style plain-text "no tests" output is not a clean run', () => {
-  // Recorded from forge 1.7.1 in the spike: exit 0, plain text on stdout.
+  // Recorded from forge 1.7.1: exit 0, plain text on stdout.
   for (const stdout of [
     'No tests found in project! Forge looks for functions that start with `test`\n',
     'Warning: no tests match the provided pattern:\n\tmatch-test: `x`\n',
