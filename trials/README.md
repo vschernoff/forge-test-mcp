@@ -81,7 +81,7 @@ in the record) and `summary.json`. Each record holds:
 - **deniedToolAttempts**, from the run's `permission_denials`.
 
 The summary gives, per task and arm, successes and the median iterations, tool calls, tokens,
-and input+output tokens.
+and input+output tokens, followed by one `ALL` row per arm over every task.
 
 **M3 is met** when, over all four tasks, arm `A-tool` succeeds at least as often as `B-shell` and
 its median turns or tokens are lower. Copy the results directory to the kit's

@@ -226,8 +226,13 @@ test('records and summary are written in the eval/results/<date>/trials layout',
   const record = JSON.parse(fs.readFileSync(file, 'utf8'))
   assert.equal(record.transcript.path, path.join('fix-assert', 'A-tool', 'run-1.transcript.jsonl'))
   assert.ok(fs.existsSync(path.join(results, record.transcript.path)))
-  const [row] = writeSummary(results)
-  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(results, 'summary.json'), 'utf8')), [row])
+  const summary = writeSummary(results)
+  const [row] = summary
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(results, 'summary.json'), 'utf8')), summary)
+  assert.deepEqual(
+    summary.map((r) => r.task),
+    ['fix-assert', 'ALL']
+  )
   assert.equal(row.medianTokens, 5500)
   assert.equal(row.medianInputOutputTokens, 1200)
 })
@@ -244,15 +249,31 @@ test('summary groups by task and arm with medians', () => {
     misreads: [],
     finished: true,
   })
-  const [a, b] = summarize([
+  const rows = summarize([
     r('A-tool', true, 4, 100),
     r('A-tool', true, 6, 300),
     r('B-shell', false, 9, 900, [{}]),
+    { ...r('A-tool', false, 10, 1000), task: 'u' },
   ])
+  const [a, b] = rows
   assert.equal(a.medianIterations, 5)
   assert.equal(a.medianTokens, 200)
   assert.equal(a.successes, 2)
   assert.equal(b.gamingRuns, 1)
+  // The M3 comparison: one ALL row per arm, over every task.
+  const all = rows.filter((row) => row.task === 'ALL')
+  assert.deepEqual(
+    all.map(({ arm, runs, successes, medianIterations }) => ({
+      arm,
+      runs,
+      successes,
+      medianIterations,
+    })),
+    [
+      { arm: 'A-tool', runs: 3, successes: 2, medianIterations: 6 },
+      { arm: 'B-shell', runs: 1, successes: 0, medianIterations: 9 },
+    ]
+  )
 })
 
 test(
