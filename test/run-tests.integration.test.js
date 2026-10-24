@@ -2,12 +2,12 @@
 // CI runs this for every forge version in the compatibility matrix (FR-36).
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
-const os = require('node:os')
 const path = require('node:path')
 const test = require('node:test')
 
 const { startServer } = require('./helpers/mcp-client')
 const { forgeBinary, makeProject, skipWithoutForge } = require('./helpers/projects')
+const { tempDir } = require('./helpers/tmp')
 
 const skip = skipWithoutForge()
 const CALL_TIMEOUT_MS = 240_000
@@ -29,6 +29,31 @@ async function callTool(root, tool, args = {}, serverArgs = []) {
 
 function callRunTests(root, args = {}, serverArgs = []) {
   return callTool(root, 'run_tests', args, serverArgs)
+}
+
+/** PIDs of `forge test` processes of the binary under test whose working directory is `root`. */
+function forgeProcessesIn(root) {
+  const { spawnSync } = require('node:child_process')
+  const pids = spawnSync('pgrep', ['-f', `${forgeBinary()} test`], { encoding: 'utf8' })
+    .stdout.split('\n')
+    .filter(Boolean)
+    .map(Number)
+  return pids.filter((pid) => {
+    let cwd
+    try {
+      cwd = fs.readlinkSync(`/proc/${pid}/cwd`) // Linux
+    } catch {
+      const lsof = spawnSync('lsof', ['-a', '-d', 'cwd', '-p', String(pid), '-Fn'], {
+        encoding: 'utf8',
+      }) // macOS
+      cwd =
+        lsof.stdout
+          .split('\n')
+          .find((line) => line.startsWith('n'))
+          ?.slice(1) ?? null
+    }
+    return cwd !== null && fs.realpathSync(cwd) === fs.realpathSync(root)
+  })
 }
 
 function failure(payload, test) {
@@ -131,7 +156,7 @@ test(
   'a directory without foundry.toml is isError NOT_A_FOUNDRY_PROJECT (FR-35)',
   { skip },
   async () => {
-    const empty = fs.mkdtempSync(path.join(os.tmpdir(), 'ftm-empty-'))
+    const empty = tempDir('ftm-empty-')
     fs.mkdirSync(path.join(empty, '.git'))
     const { isError, payload } = await callRunTests(empty)
     assert.equal(isError, true)
@@ -167,16 +192,17 @@ test(
 
 test('a run that exceeds the timeout is isError TIMEOUT (FR-37)', { skip }, async () => {
   const started = Date.now()
-  const { isError, payload } = await callRunTests(await makeProject('hang'), {}, ['--timeout', '8'])
+  const root = await makeProject('hang')
+  const { isError, payload } = await callRunTests(root, {}, ['--timeout', '8'])
   assert.equal(isError, true)
   assert.equal(payload.error.code, 'TIMEOUT')
   assert.ok(Date.now() - started < 60_000)
   if (process.platform !== 'win32') {
-    // No forge process from this binary may outlive the run.
-    const { spawnSync } = require('node:child_process')
+    // No forge process for this project may outlive the run. Other sessions may run the same
+    // forge binary at the same time, so only processes working in this project count.
     await new Promise((resolve) => setTimeout(resolve, 3000))
-    const left = spawnSync('pgrep', ['-f', `${forgeBinary()} test`], { encoding: 'utf8' })
-    assert.equal(left.stdout.trim(), '', `forge still running: ${left.stdout}`)
+    const left = forgeProcessesIn(root)
+    assert.deepEqual(left, [], `forge still running in ${root}: ${left.join(', ')}`)
   }
 })
 

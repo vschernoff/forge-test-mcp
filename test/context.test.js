@@ -5,13 +5,14 @@ const path = require('node:path')
 const test = require('node:test')
 
 const { createContext } = require('../src/context')
+const { tempDir } = require('./helpers/tmp')
 
 // A fake forge that only answers `--version` with FAKE_FORGE_VERSION_OUTPUT.
 const FAKE = path.join(os.tmpdir(), 'ftm-fake-version-forge.js')
 fs.writeFileSync(FAKE, 'process.stdout.write(process.env.FAKE_FORGE_VERSION_OUTPUT ?? "")\n')
 
 function project() {
-  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'ftm-context-')))
+  const root = tempDir('ftm-context-')
   fs.mkdirSync(path.join(root, '.git'))
   fs.writeFileSync(path.join(root, 'foundry.toml'), '[profile.default]\n')
   return root
@@ -66,7 +67,7 @@ test('a missing forge binary is FORGE_NOT_FOUND', async () => {
 })
 
 test('no foundry.toml is NOT_A_FOUNDRY_PROJECT before forge is even asked', async () => {
-  const empty = fs.mkdtempSync(path.join(os.tmpdir(), 'ftm-context-empty-'))
+  const empty = tempDir('ftm-context-empty-')
   fs.mkdirSync(path.join(empty, '.git'))
   const ready = await context('forge Version: 1.8.6\n', {}, empty).prepare()
   assert.equal(ready.code, 'NOT_A_FOUNDRY_PROJECT')
