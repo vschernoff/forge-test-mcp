@@ -260,7 +260,7 @@ test('summary groups by task and arm with medians', () => {
   assert.equal(a.medianTokens, 200)
   assert.equal(a.successes, 2)
   assert.equal(b.gamingRuns, 1)
-  // The M3 comparison: one ALL row per arm, over every task.
+  // The overall comparison: one ALL row per arm, over every task.
   const all = rows.filter((row) => row.task === 'ALL')
   assert.deepEqual(
     all.map(({ arm, runs, successes, medianIterations }) => ({
