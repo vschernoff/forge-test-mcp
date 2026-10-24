@@ -39,14 +39,14 @@ test('forge older than 1.8.5 is refused with an install hint (FR-36)', async () 
   const ready = await context('forge Version: 1.7.1\n').prepare()
   assert.equal(ready.ok, false)
   assert.equal(ready.code, 'UNSUPPORTED_FORGE_VERSION')
-  assert.match(ready.message, /1\.7\.1 is outside the supported range >=1\.8\.5 <1\.9\.0/)
+  assert.match(ready.message, /1\.7\.1 is older than the supported range >=1\.8\.5 <1\.9\.0/)
   assert.match(ready.hint, /foundryup -i 1\.8\.6/)
 })
 
 test('newer forge runs but is flagged, unless --strict-version (D19 Q2)', async () => {
   const lenient = await context('forge Version: 1.9.0\n').prepare()
   assert.equal(lenient.forgeVersion, '1.9.0')
-  assert.match(lenient.untested, /outside the tested range/)
+  assert.match(lenient.untested, /newer than the tested range/)
   const strict = await context('forge Version: 1.9.0\n', { strictVersion: true }).prepare()
   assert.equal(strict.code, 'UNSUPPORTED_FORGE_VERSION')
 })
@@ -86,4 +86,26 @@ test('withLock runs tasks for one root one at a time', async () => {
     })
   await Promise.all([ctx.withLock('/r', task('a', 50)), ctx.withLock('/r', task('b', 10))])
   assert.deepEqual(order, ['start a', 'end a', 'start b', 'end b'])
+})
+
+// Recorded from forge-test-mcp's Docker CI: the official v1.8.6 Alpine build calls itself
+// 1.8.6-dev, but its commit is the v1.8.6 release commit.
+const ALPINE_1_8_6 =
+  'forge Version: 1.8.6-dev\nCommit SHA: 6bad0a66de7c83f7b33695044138f0f5fa4c5990\n' +
+  'Build Timestamp: 2026-10-21T17:36:15.539564462Z (1792604175)\nBuild Profile: dist\n'
+
+test('a -dev build of a release commit counts as that release, even with --strict-version', async () => {
+  const ready = await context(ALPINE_1_8_6, { strictVersion: true }).prepare()
+  assert.equal(ready.forgeVersion, '1.8.6')
+  assert.equal(ready.untested, null)
+})
+
+test('a pre-release build of any other commit is flagged as pre-release', async () => {
+  const nightly =
+    'forge Version: 1.8.6-nightly\nCommit SHA: 4e8874b2bdc840929585ca73e170993c50a4a531\n'
+  const lenient = await context(nightly).prepare()
+  assert.match(lenient.untested, /a pre-release build, not a tested release/)
+  const strict = await context(nightly, { strictVersion: true }).prepare()
+  assert.equal(strict.code, 'UNSUPPORTED_FORGE_VERSION')
+  assert.match(strict.message, /is a pre-release build and --strict-version is set/)
 })
