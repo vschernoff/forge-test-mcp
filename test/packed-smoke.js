@@ -4,12 +4,12 @@
 const assert = require('node:assert/strict')
 const { spawnSync } = require('node:child_process')
 const fs = require('node:fs')
-const os = require('node:os')
 const path = require('node:path')
 
 const packageJson = require('../package.json')
 const { startServer } = require('./helpers/mcp-client')
 const { forgeBinary, makeProject } = require('./helpers/projects')
+const { tempDir } = require('./helpers/tmp')
 
 const PACKAGE_ROOT = path.resolve(__dirname, '..')
 const IS_WINDOWS = process.platform === 'win32'
@@ -29,7 +29,7 @@ function npm(args, cwd) {
 }
 
 async function main() {
-  const work = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'ftm-packed-')))
+  const work = tempDir('ftm-packed-')
   const [packed] = JSON.parse(npm(['pack', '--json', '--pack-destination', work], PACKAGE_ROOT))
   const files = packed.files.map((f) => f.path).sort()
   const unexpected = files.filter((f) => !f.startsWith('src/') && !EXPECTED_FILES.includes(f))
