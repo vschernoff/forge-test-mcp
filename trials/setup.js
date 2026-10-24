@@ -38,12 +38,15 @@ function shellQuote(value) {
   return `'${String(value).replace(/'/g, `'\\''`)}'`
 }
 
-function runScript({ arm, maxTurns }) {
+function runScript({ arm, maxTurns, forge }) {
   return `#!/bin/sh
 # D16 trial run. Uses your Claude Code login: ANTHROPIC_API_KEY is unset so the subscription is
 # used, and --bare is not used (it ignores the login). Writes transcript.jsonl next to this file.
 set -eu
 cd "$(dirname "$0")"
+# The forge chosen at setup comes first on PATH: the shell arm runs \`forge test\` by name, and the
+# chosen forge need not be installed on PATH at all.
+export PATH=${shellQuote(path.dirname(forge))}:"$PATH"
 date -u +%Y-%m-%dT%H:%M:%SZ > started-at.txt
 env -u ANTHROPIC_API_KEY claude -p "$(cat PROMPT.txt)" \\
   --output-format stream-json --verbose \\
@@ -105,7 +108,10 @@ async function setup({ forge, out, runs, build }) {
           path.join(dir, 'mcp.json'),
           `${JSON.stringify({ mcpServers: servers }, null, 2)}\n`
         )
-        fs.writeFileSync(path.join(dir, 'RUN.sh'), runScript({ arm, maxTurns: SPEC.maxTurns }))
+        fs.writeFileSync(
+          path.join(dir, 'RUN.sh'),
+          runScript({ arm, maxTurns: SPEC.maxTurns, forge })
+        )
         fs.chmodSync(path.join(dir, 'RUN.sh'), 0o755)
         fs.writeFileSync(
           path.join(dir, 'trial.json'),
