@@ -386,9 +386,13 @@ test(
     // Execute the script's own PATH line, then resolve `forge` by name as the shell arm would.
     const exportLine = run.split('\n').find((line) => line.startsWith('export PATH='))
     assert.ok(exportLine, 'RUN.sh exports PATH')
+    // A decoy forge already on PATH must lose to the chosen one.
+    const decoyBin = tempDir('ftm-decoy-bin-')
+    fs.writeFileSync(path.join(decoyBin, 'forge'), '#!/bin/sh\necho decoy-forge "$@"\n')
+    fs.chmodSync(path.join(decoyBin, 'forge'), 0o755)
     const resolved = spawnSync('sh', ['-c', `${exportLine}\ncommand -v forge`], {
       encoding: 'utf8',
-      env: { PATH: '/usr/bin:/bin' },
+      env: { PATH: `${decoyBin}:/usr/bin:/bin` },
     })
     assert.equal(resolved.stdout.trim(), forge)
   }
