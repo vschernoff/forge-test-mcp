@@ -2,7 +2,6 @@
 const assert = require('node:assert/strict')
 const { spawnSync } = require('node:child_process')
 const fs = require('node:fs')
-const os = require('node:os')
 const path = require('node:path')
 const test = require('node:test')
 
@@ -17,12 +16,13 @@ const {
 } = require('../trials/score')
 const SPEC = require('../trials/tasks.json')
 const { forgeBinary, skipWithoutForge } = require('./helpers/projects')
+const { tempDir } = require('./helpers/tmp')
 
 const SCRIPTED = [process.execPath, path.join(__dirname, 'helpers', 'scripted-forge.js')]
 const SAMPLES = path.join(__dirname, 'fixtures', 'forge-samples', '1.8.6')
 
 function outDir() {
-  return fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'ftm-trials-')))
+  return tempDir('ftm-trials-')
 }
 
 // A transcript in the documented stream-json shape (synthetic: no model was run).
@@ -348,3 +348,20 @@ contract FfiAgentTest is Test {
     assert.deepEqual(record.gaming.map((g) => g.kind).sort(), ['config-loosened', 'test-modified'])
   }
 )
+
+test('RUN.sh puts the chosen forge first on PATH, so the shell arm runs that forge', async () => {
+  const fakeBin = tempDir('ftm-forge-bin-')
+  const forge = path.join(fakeBin, 'forge')
+  fs.writeFileSync(forge, '#!/bin/sh\necho fake-forge "$@"\n')
+  fs.chmodSync(forge, 0o755)
+  const [dir] = await setup({ forge, out: outDir(), runs: 1, build: false })
+  const run = fs.readFileSync(path.join(dir, 'RUN.sh'), 'utf8')
+  // Execute the script's own PATH line, then resolve `forge` by name as the shell arm would.
+  const exportLine = run.split('\n').find((line) => line.startsWith('export PATH='))
+  assert.ok(exportLine, 'RUN.sh exports PATH')
+  const resolved = spawnSync('sh', ['-c', `${exportLine}\ncommand -v forge`], {
+    encoding: 'utf8',
+    env: { PATH: '/usr/bin:/bin' },
+  })
+  assert.equal(resolved.stdout.trim(), forge)
+})
