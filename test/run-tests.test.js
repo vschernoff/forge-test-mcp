@@ -2,7 +2,6 @@
 // on demand (review of #3: each test below kills a mutant that survived the integration suite).
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
-const os = require('node:os')
 const path = require('node:path')
 const test = require('node:test')
 
@@ -10,13 +9,14 @@ const { createContext } = require('../src/context')
 const { runTests } = require('../src/run-tests')
 const { killRecordedPids } = require('./helpers/cleanup')
 const { startServer } = require('./helpers/mcp-client')
+const { tempDir } = require('./helpers/tmp')
 
 const SCRIPTED = path.join(__dirname, 'helpers', 'scripted-forge.js')
 const SAMPLE = path.join(__dirname, 'fixtures', 'forge-samples', '1.8.6', 'fail-assert.json')
 const KEY = '0x2222222222222222222222222222222222222222222222222222222222222222'
 
 function project() {
-  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'ftm-runtests-')))
+  const root = tempDir('ftm-runtests-')
   fs.mkdirSync(path.join(root, '.git'))
   fs.writeFileSync(path.join(root, 'foundry.toml'), '[profile.default]\n')
   const stdout = path.join(root, '.forge-stdout.json')

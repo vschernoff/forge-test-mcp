@@ -1,16 +1,16 @@
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
-const os = require('node:os')
 const path = require('node:path')
 const test = require('node:test')
 
 const { runProcess } = require('../src/forge-process')
 const { killRecordedPids } = require('./helpers/cleanup')
+const { tempDir: makeTempDir } = require('./helpers/tmp')
 
 const FAKE_FORGE = [process.execPath, path.join(__dirname, 'helpers', 'fake-forge.js')]
 
 function tempDir() {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'forge-test-mcp-process-'))
+  return makeTempDir('forge-test-mcp-process-')
 }
 
 function isAlive(pid) {

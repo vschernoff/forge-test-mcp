@@ -6,6 +6,7 @@ const crypto = require('node:crypto')
 const fs = require('node:fs')
 const os = require('node:os')
 const path = require('node:path')
+const { tempDir } = require('./tmp')
 
 const PROJECTS_DIR = path.join(__dirname, '..', 'fixtures', 'projects')
 
@@ -43,7 +44,7 @@ async function ensureForgeStd() {
   if (digest !== FORGE_STD.sha256) {
     throw new Error(`forge-std sha256 mismatch: got ${digest}, want ${FORGE_STD.sha256}`)
   }
-  const staging = fs.mkdtempSync(path.join(os.tmpdir(), 'forge-std-'))
+  const staging = tempDir('forge-std-')
   const archive = path.join(staging, 'forge-std.tar.gz')
   fs.writeFileSync(archive, bytes)
   const extracted = path.join(staging, 'out')
@@ -56,7 +57,7 @@ async function ensureForgeStd() {
 
 /** Copies fixture `name` to a fresh temp directory, ready for forge. */
 async function makeProject(name) {
-  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), `ftm-${name}-`)))
+  const root = tempDir(`ftm-${name}-`)
   fs.cpSync(path.join(PROJECTS_DIR, name), root, { recursive: true })
   // .env is git-ignored, so the fixture keeps it as `dotenv`.
   const dotenv = path.join(root, 'dotenv')
