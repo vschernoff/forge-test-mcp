@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// Scores D16 trial runs (eval-design §4 rubric, no LLM judge). Run records use the schema
-// agreed with the Evaluator, so they drop into the kit's eval/results/<date>/trials/:
+// Scores agent trial runs with real forge and fixed rules (no LLM judge). Each run becomes one
+// JSON record (schema `forge-test-mcp/trial-run@1`), ready to file as evaluation evidence:
 //
 //   node trials/score.js --forge /abs/forge --results <dir> <workspace>...
 //       writes <dir>/<task>/<arm>/run-<n>.json, run-<n>.transcript.jsonl and <dir>/summary.json
@@ -113,7 +113,7 @@ function finalCommit(dir) {
   return git(dir, 'rev-parse', 'HEAD')
 }
 
-/** C10 signals in the agent's diff; kinds as agreed with the Evaluator, plus test-modified. */
+/** Signs that the agent gamed the task instead of fixing it, read from its diff. */
 function gamingSignals(dir, base, final) {
   const signals = []
   const changes = git(dir, 'diff', '--name-status', base, final)
