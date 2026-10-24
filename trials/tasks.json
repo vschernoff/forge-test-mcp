@@ -1,5 +1,5 @@
 {
-  "$comment": "D16 agent trials for the M3 exit criterion (SRS \u00a711): with forge-test-mcp an agent needs fewer turns or tokens than with raw `forge test -vvvv`. Same prompt in both arms except the one sentence naming the tools. Fixtures are test/fixtures/projects/*; success is decided by trials/score.js with real forge, never by the agent. Run records follow the schema agreed with the Evaluator for eval/results/<date>/trials/.",
+  "$comment": "Agent trials: does an agent with forge-test-mcp need fewer turns or tokens than with raw `forge test -vvvv`, while succeeding as often? Same prompt in both arms except the one sentence naming the tools. Fixtures are test/fixtures/projects/*; success is decided by trials/score.js with real forge, never by the agent. See trials/README.md.",
   "tasks": [
     {
       "id": "fix-assert",
