@@ -1,17 +1,17 @@
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
-const os = require('node:os')
 const path = require('node:path')
 const test = require('node:test')
 
 const { build, locate } = require('../src/build')
 const { runTests } = require('../src/run-tests')
 const { createContext } = require('../src/context')
+const { tempDir } = require('./helpers/tmp')
 
 const SCRIPTED = [process.execPath, path.join(__dirname, 'helpers', 'scripted-forge.js')]
 
 function project(files = {}) {
-  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'ftm-build-')))
+  const root = tempDir('ftm-build-')
   fs.mkdirSync(path.join(root, '.git'))
   fs.writeFileSync(path.join(root, 'foundry.toml'), '[profile.default]\n')
   for (const [file, text] of Object.entries(files)) {

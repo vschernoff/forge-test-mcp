@@ -2,12 +2,12 @@
 // mutant that survived the integration suite).
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
-const os = require('node:os')
 const path = require('node:path')
 const test = require('node:test')
 
 const { createContext } = require('../src/context')
 const { runTests } = require('../src/run-tests')
+const { tempDir } = require('./helpers/tmp')
 
 const SCRIPTED = path.join(__dirname, 'helpers', 'scripted-forge.js')
 const FIXTURES = path.join(__dirname, 'fixtures')
@@ -15,7 +15,7 @@ const FIXTURES = path.join(__dirname, 'fixtures')
 // A matching pair recorded from forge 1.8.6 on the edge-cases fixture: the JSON report and the
 // -vvv text output of the same tests.
 function project({ text = 'text-traces/1.8.6-edge-cases.txt' } = {}) {
-  const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'ftm-tracepass-')))
+  const root = tempDir('ftm-tracepass-')
   fs.mkdirSync(path.join(root, '.git'))
   fs.writeFileSync(path.join(root, 'foundry.toml'), '[profile.default]\n')
   const sample = path.join(FIXTURES, 'forge-samples', '1.8.6', 'edge-setup-skip-logs.json')

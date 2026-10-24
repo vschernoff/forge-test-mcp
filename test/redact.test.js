@@ -1,15 +1,15 @@
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
-const os = require('node:os')
 const path = require('node:path')
 const test = require('node:test')
 
 const { collectSecrets, redact, parseDotenv } = require('../src/redact')
+const { tempDir } = require('./helpers/tmp')
 
 const KEY = '0xAbCd111111111111111111111111111111111111111111111111111111112222'
 
 function project(dotenv) {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ftm-redact-'))
+  const root = tempDir('ftm-redact-')
   if (dotenv !== undefined) fs.writeFileSync(path.join(root, '.env'), dotenv)
   return root
 }
