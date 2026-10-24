@@ -14,6 +14,18 @@ that did not run.
 > **Status:** in development, not yet published to npm. The commands below show how it will
 > be used once it is.
 
+## Before you use it
+
+- **Running tests runs code.** `forge test` executes the project's Solidity with your user's
+  rights. Use this server only on projects you would test in a terminal yourself.
+- **FFI is off** unless you start the server with `--allow-ffi`, even when `foundry.toml`
+  enables it. forge runs with `--offline`, but tests can still reach the network themselves,
+  for example through fork cheatcodes.
+- **No transactions.** No tool sends transactions, deploys, signs or takes a key.
+- **Passing tests do not prove a contract is secure.**
+
+Details in [Security and trust](#security-and-trust).
+
 ## Requirements
 
 - Node.js 22 or later.
@@ -54,8 +66,9 @@ Pin an exact version. Client shortcuts, from each vendor's documentation (checke
 
 ### Docker
 
-The image contains the server and forge 1.8.6 (the official static Alpine build, checked
-against the release's provenance digests during the build). Mount the project at `/project`
+The image contains the server and forge 1.8.6, the official static Alpine build. The build
+checks the download against pinned SHA-256 digests; those digests were taken from the release's
+provenance attestation and verified when they were pinned. Mount the project at `/project`
 and a cache volume at `/cache`, where forge keeps the compiler:
 
 ```bash
@@ -171,6 +184,8 @@ What the server does to reduce that risk:
   test with an agent.
 - **No transactions.** No tool broadcasts, deploys, signs or takes a key.
 
+To report a vulnerability, see [SECURITY.md](SECURITY.md).
+
 **Passing tests do not prove a contract is secure.** They show the tests you wrote pass.
 Contracts that will hold value need an independent audit.
 
@@ -179,6 +194,12 @@ Contracts that will hold value need an independent audit.
 Tested in CI against forge **1.8.5 and 1.8.6** on Linux, macOS and Windows. Supported range:
 `>=1.8.5 <1.9.0`. Older versions are refused. Newer ones run with a `forgeUntested` note
 (or are refused with `--strict-version`).
+
+## Development
+
+`npm test` runs the unit tests. With `FORGE_BIN=/path/to/forge` it also runs the integration
+tests against a real forge. `npm run lint` checks style. Requirement IDs in code and tests
+(FR-, NFR-, D-) refer to the project's internal specification.
 
 ## License
 

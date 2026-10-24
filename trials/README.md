@@ -1,9 +1,9 @@
-# Agent trials (D16, SRS M3)
+# Agent trials
 
-M3's exit criterion: **on the fixture tasks, an agent with forge-test-mcp needs fewer turns or
-fewer tokens than the same agent with raw `forge test -vvvv`, and succeeds at least as often.**
-Trials run by hand with your own Claude Code login (D16: no API key, no CI spend). This kit
-follows the agent-trial rubric of the kit's evaluation design (eval-design §4). Success is
+The question these trials answer: **on the fixture tasks, does an agent with forge-test-mcp need
+fewer turns or fewer tokens than the same agent with raw `forge test -vvvv`, while succeeding
+at least as often?** Trials are run by hand with your own Claude Code login, so they need no
+API key and cost nothing in CI. Scoring follows a fixed rubric with no LLM judge: success is
 decided by running real forge on the result, never by what the agent says.
 
 Not part of the npm package.
@@ -60,8 +60,7 @@ node trials/score.js --forge "$(command -v forge)" --results ~/ftm-results ~/ftm
 node trials/score.js --summary ~/ftm-results
 ```
 
-`--results` writes one record per run, in the layout the kit's `eval/results/<date>/trials/`
-uses (schema `forge-test-mcp/trial-run@1`, agreed with the Evaluator):
+`--results` writes one record per run (schema `forge-test-mcp/trial-run@1`):
 `<task>/<arm>/run-<n>.json`, plus the verbatim `run-<n>.transcript.jsonl` (its sha256 is
 in the record) and `summary.json`. Each record holds:
 
@@ -74,7 +73,7 @@ in the record) and `summary.json`. Each record holds:
   the scorer.
 - **iterations** (`num_turns`), **tokens** (`input`, `output`, `cacheRead`, `cacheWrite`),
   **toolCalls** by name, `durationMs`, `client`, `model` and `startedAt`.
-- **gaming** (C10): `test-deleted`, `test-skipped`, `test-modified`, `fuzz-runs-lowered`,
+- **gaming**, meaning weakening the checks instead of fixing the code: `test-deleted`, `test-skipped`, `test-modified`, `fuzz-runs-lowered`,
   `config-loosened` or `solhint-disable`, each with the file and the offending line.
 - **misreads**: the final message claims the tests pass while they fail. This points a human
   to the transcript; it is not a verdict.
@@ -83,9 +82,9 @@ in the record) and `summary.json`. Each record holds:
 The summary gives, per task and arm, successes and the median iterations, tool calls, tokens,
 and input+output tokens.
 
-**M3 is met** when, over all four tasks, arm `A-tool` succeeds at least as often as `B-shell` and
-its median turns or tokens are lower. Copy the results directory to the kit's
-`eval/results/<date>/trials/` as the evidence.
+**The tool helps** when, over all four tasks, arm `A-tool` succeeds at least as often as
+`B-shell` and its median turns or tokens are lower. Keep the results directory (records,
+transcripts, summary) as the evidence.
 
 ## Limits
 
@@ -95,5 +94,4 @@ its median turns or tokens are lower. Copy the results directory to the kit's
   what `score.js` reads.
 - Token counts include cache reads, which are cheap. Compare input+output separately if
   the totals differ mainly through caching.
-- One client only. A Codex run would need its own `RUN.sh` (D16 allows it when Codex is
-  set up).
+- One client only. A Codex run would need its own `RUN.sh`.
