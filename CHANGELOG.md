@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0 — first release
+## 0.1.0 — 2026-10-28
 
 An MCP server that runs Foundry's `forge test` and `forge build` and returns compact,
 structured results to AI coding agents.
