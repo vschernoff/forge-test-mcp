@@ -1,7 +1,6 @@
 {
   "name": "forge-test-mcp",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.1.0",
   "mcpName": "io.github.vschernoff/forge-test-mcp",
   "description": "MCP server that runs Foundry builds and tests and returns compact, structured failures to any MCP client (Claude Code, Codex, Cursor, and others)",
   "main": "src/index.js",
