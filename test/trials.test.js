@@ -2,7 +2,6 @@
 const assert = require('node:assert/strict')
 const { spawnSync } = require('node:child_process')
 const fs = require('node:fs')
-const os = require('node:os')
 const path = require('node:path')
 const test = require('node:test')
 
@@ -17,12 +16,13 @@ const {
 } = require('../trials/score')
 const SPEC = require('../trials/tasks.json')
 const { forgeBinary, skipWithoutForge } = require('./helpers/projects')
+const { tempDir } = require('./helpers/tmp')
 
 const SCRIPTED = [process.execPath, path.join(__dirname, 'helpers', 'scripted-forge.js')]
 const SAMPLES = path.join(__dirname, 'fixtures', 'forge-samples', '1.8.6')
 
 function outDir() {
-  return fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'ftm-trials-')))
+  return tempDir('ftm-trials-')
 }
 
 // A transcript in the documented stream-json shape (synthetic: no model was run).
@@ -226,8 +226,13 @@ test('records and summary are written in the eval/results/<date>/trials layout',
   const record = JSON.parse(fs.readFileSync(file, 'utf8'))
   assert.equal(record.transcript.path, path.join('fix-assert', 'A-tool', 'run-1.transcript.jsonl'))
   assert.ok(fs.existsSync(path.join(results, record.transcript.path)))
-  const [row] = writeSummary(results)
-  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(results, 'summary.json'), 'utf8')), [row])
+  const summary = writeSummary(results)
+  const [row] = summary
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(results, 'summary.json'), 'utf8')), summary)
+  assert.deepEqual(
+    summary.map((r) => r.task),
+    ['fix-assert', 'ALL']
+  )
   assert.equal(row.medianTokens, 5500)
   assert.equal(row.medianInputOutputTokens, 1200)
 })
@@ -244,15 +249,31 @@ test('summary groups by task and arm with medians', () => {
     misreads: [],
     finished: true,
   })
-  const [a, b] = summarize([
+  const rows = summarize([
     r('A-tool', true, 4, 100),
     r('A-tool', true, 6, 300),
     r('B-shell', false, 9, 900, [{}]),
+    { ...r('A-tool', false, 10, 1000), task: 'u' },
   ])
+  const [a, b] = rows
   assert.equal(a.medianIterations, 5)
   assert.equal(a.medianTokens, 200)
   assert.equal(a.successes, 2)
   assert.equal(b.gamingRuns, 1)
+  // The M3 comparison: one ALL row per arm, over every task.
+  const all = rows.filter((row) => row.task === 'ALL')
+  assert.deepEqual(
+    all.map(({ arm, runs, successes, medianIterations }) => ({
+      arm,
+      runs,
+      successes,
+      medianIterations,
+    })),
+    [
+      { arm: 'A-tool', runs: 3, successes: 2, medianIterations: 6 },
+      { arm: 'B-shell', runs: 1, successes: 0, medianIterations: 9 },
+    ]
+  )
 })
 
 test(
@@ -348,3 +369,20 @@ contract FfiAgentTest is Test {
     assert.deepEqual(record.gaming.map((g) => g.kind).sort(), ['config-loosened', 'test-modified'])
   }
 )
+
+test('RUN.sh puts the chosen forge first on PATH, so the shell arm runs that forge', async () => {
+  const fakeBin = tempDir('ftm-forge-bin-')
+  const forge = path.join(fakeBin, 'forge')
+  fs.writeFileSync(forge, '#!/bin/sh\necho fake-forge "$@"\n')
+  fs.chmodSync(forge, 0o755)
+  const [dir] = await setup({ forge, out: outDir(), runs: 1, build: false })
+  const run = fs.readFileSync(path.join(dir, 'RUN.sh'), 'utf8')
+  // Execute the script's own PATH line, then resolve `forge` by name as the shell arm would.
+  const exportLine = run.split('\n').find((line) => line.startsWith('export PATH='))
+  assert.ok(exportLine, 'RUN.sh exports PATH')
+  const resolved = spawnSync('sh', ['-c', `${exportLine}\ncommand -v forge`], {
+    encoding: 'utf8',
+    env: { PATH: '/usr/bin:/bin' },
+  })
+  assert.equal(resolved.stdout.trim(), forge)
+})

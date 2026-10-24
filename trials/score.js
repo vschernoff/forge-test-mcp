@@ -226,6 +226,27 @@ function median(values) {
 const sum = (tokens) =>
   tokens ? tokens.input + tokens.output + tokens.cacheRead + tokens.cacheWrite : null
 
+function summaryRow(task, arm, group) {
+  return {
+    task,
+    arm,
+    runs: group.length,
+    successes: group.filter((r) => r.success.passed).length,
+    medianIterations: median(group.map((r) => r.iterations)),
+    medianToolCalls: median(
+      group.map((r) => Object.values(r.toolCalls ?? {}).reduce((a, b) => a + b, 0))
+    ),
+    medianTokens: median(group.map((r) => sum(r.tokens))),
+    medianInputOutputTokens: median(
+      group.map((r) => (r.tokens ? r.tokens.input + r.tokens.output : null))
+    ),
+    gamingRuns: group.filter((r) => r.gaming.length).length,
+    misreadRuns: group.filter((r) => r.misreads.length).length,
+    unfinished: group.filter((r) => !r.finished).length,
+  }
+}
+
+/** One row per (task, arm), then one `ALL` row per arm over every task: the overall comparison. */
 function summarize(records) {
   const groups = new Map()
   for (const record of records) {
@@ -233,26 +254,18 @@ function summarize(records) {
     if (!groups.has(key)) groups.set(key, [])
     groups.get(key).push(record)
   }
-  return [...groups].map(([key, group]) => {
-    const [task, arm] = key.split('\t')
-    return {
-      task,
-      arm,
-      runs: group.length,
-      successes: group.filter((r) => r.success.passed).length,
-      medianIterations: median(group.map((r) => r.iterations)),
-      medianToolCalls: median(
-        group.map((r) => Object.values(r.toolCalls ?? {}).reduce((a, b) => a + b, 0))
-      ),
-      medianTokens: median(group.map((r) => sum(r.tokens))),
-      medianInputOutputTokens: median(
-        group.map((r) => (r.tokens ? r.tokens.input + r.tokens.output : null))
-      ),
-      gamingRuns: group.filter((r) => r.gaming.length).length,
-      misreadRuns: group.filter((r) => r.misreads.length).length,
-      unfinished: group.filter((r) => !r.finished).length,
-    }
-  })
+  const rows = [...groups].map(([key, group]) => summaryRow(...key.split('\t'), group))
+  const arms = [...new Set(records.map((r) => r.arm))].sort()
+  return [
+    ...rows,
+    ...arms.map((arm) =>
+      summaryRow(
+        'ALL',
+        arm,
+        records.filter((r) => r.arm === arm)
+      )
+    ),
+  ]
 }
 
 function writeRecord(resultsDir, record) {
