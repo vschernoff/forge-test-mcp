@@ -83,8 +83,8 @@ in the record) and `summary.json`. Each record holds:
 The summary gives, per task and arm, successes and the median iterations, tool calls, tokens,
 and input+output tokens, followed by one `ALL` row per arm over every task.
 
-**M3 is met** when, over all four tasks, arm `A-tool` succeeds at least as often as `B-shell` and
-its median turns or tokens are lower. Copy the results directory to the kit's
+**M3 is met** when, in the `ALL` rows, arm `A-tool` succeeds at least as often as `B-shell` and
+its median iterations or tokens are lower. Copy the results directory to the kit's
 `eval/results/<date>/trials/` as the evidence.
 
 ## Limits
