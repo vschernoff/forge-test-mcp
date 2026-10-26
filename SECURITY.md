@@ -11,8 +11,8 @@ smallest project or tool call that shows it. You'll get an answer in the advisor
 
 ## Supported versions
 
-forge-test-mcp has not had a release yet. Until the first release, only the latest commit on
-`main` is supported. After that, the latest published version is.
+Only the latest published version on npm gets security fixes. Fixes are released as a new
+version; upgrade to it rather than patching an older one.
 
 ## What counts as a vulnerability here
 

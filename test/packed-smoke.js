@@ -13,7 +13,14 @@ const { tempDir } = require('./helpers/tmp')
 
 const PACKAGE_ROOT = path.resolve(__dirname, '..')
 const IS_WINDOWS = process.platform === 'win32'
-const EXPECTED_FILES = ['LICENSE', 'NOTICE', 'README.md', 'package.json']
+const EXPECTED_FILES = [
+  'CHANGELOG.md',
+  'LICENSE',
+  'NOTICE',
+  'README.md',
+  'SECURITY.md',
+  'package.json',
+]
 
 function npm(args, cwd) {
   const result = spawnSync(IS_WINDOWS ? 'npm.cmd' : 'npm', args, {
@@ -33,7 +40,11 @@ async function main() {
   const [packed] = JSON.parse(npm(['pack', '--json', '--pack-destination', work], PACKAGE_ROOT))
   const files = packed.files.map((f) => f.path).sort()
   const unexpected = files.filter((f) => !f.startsWith('src/') && !EXPECTED_FILES.includes(f))
-  assert.deepEqual(unexpected, [], 'only src/, README, LICENSE, NOTICE and package.json ship')
+  assert.deepEqual(
+    unexpected,
+    [],
+    'only src/, README, LICENSE, NOTICE, CHANGELOG, SECURITY and package.json ship'
+  )
   for (const file of EXPECTED_FILES) assert.ok(files.includes(file), `${file} is in the tarball`)
   console.error(`packed ${packed.filename}: ${files.length} files, ${packed.size} bytes`)
 

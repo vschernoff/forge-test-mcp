@@ -11,8 +11,8 @@ When forge did **not** run the tests (a compile error, no matching tests, a time
 or unsupported `forge`, …) the tool says so as an error. It never reports "0 failed" for tests
 that did not run.
 
-> **Status:** in development, not yet published to npm. The commands below show how it will
-> be used once it is.
+> **Status:** 0.1.0, the first release. See [CHANGELOG.md](CHANGELOG.md) for what is in it
+> and what is not yet verified.
 
 ## Before you use it
 
@@ -44,13 +44,13 @@ Most clients accept this `mcpServers` entry:
   "mcpServers": {
     "forge-test": {
       "command": "npx",
-      "args": ["-y", "forge-test-mcp@<version>"]
+      "args": ["-y", "forge-test-mcp@0.1.0"]
     }
   }
 }
 ```
 
-Pin an exact version. Client shortcuts, from each vendor's documentation (checked
+Pin an exact version, as above. Client shortcuts, from each vendor's documentation (checked
 2026-10-23, not yet verified by running each client):
 
 - **Claude Code:** put the JSON above in `.mcp.json` at the project root. In interactive sessions
@@ -61,7 +61,7 @@ Pin an exact version. Client shortcuts, from each vendor's documentation (checke
   ```toml
   [mcp_servers.forge-test]
   command = "npx"
-  args = ["-y", "forge-test-mcp@<version>"]
+  args = ["-y", "forge-test-mcp@0.1.0"]
   ```
 
 ### Docker
