@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0 — 2026-10-28
+## 0.1.0 — 2026-10-26
 
 An MCP server that runs Foundry's `forge test` and `forge build` and returns compact,
 structured results to AI coding agents.
@@ -46,9 +46,22 @@ structured results to AI coding agents.
 - Node.js 22 and 24.
 - A Dockerfile with forge 1.8.6 (static Alpine build, pinned digests).
 
+### Agent trials
+
+Run on 2026-10-26 with the Claude Code CLI 2.1.310, forge 1.8.6 and this server at commit
+052a1f3 (see `trials/`). Four tasks (a failing assertion, a compile error, a fuzz failure and an
+invariant failure), three runs each per arm. One arm used this server with Bash disallowed; the
+other used `forge build` / `forge test` through Bash, with no MCP server.
+
+- Both arms solved 12 of 12. Every run changed only the contract under test, and the scorer
+  flagged no gaming, no misread result and no unfinished run.
+- Median tokens: 288,158 with the server, 290,275.5 with the shell. Median turns: 9 and 7.5.
+  The two are comparable: on these tasks the server did not make the agent faster or cheaper.
+  What it adds is run health and safety: no "0 failed" for tests that did not run, FFI off,
+  `--offline`, and redacted secrets.
+
 ### Not yet verified
 
-- Use inside each MCP client. The configuration snippets come from the vendors' documentation;
-  so far the server has been driven by an MCP test client.
-- The agent trials (`trials/`) that compare an agent using this server with one using raw
-  `forge test -vvvv`.
+- Use inside each MCP client. The server has now been used from the Claude Code CLI (in the
+  agent trials). The configuration snippets for other clients come from the vendors'
+  documentation and have not been run.
