@@ -14,7 +14,7 @@ body:
     id: version
     attributes:
       label: forge-test-mcp version
-      description: The version your client starts, e.g. 0.1.0 (from your MCP config, or `npm ls forge-test-mcp`).
+      description: The version pinned in your MCP config, e.g. `forge-test-mcp@0.1.0` gives 0.1.0.
     validations:
       required: true
   - type: input
