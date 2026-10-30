@@ -156,6 +156,15 @@ The result is an MCP error (`isError: true`) with a code, a message and a hint:
 | `TIMEOUT`                                                                                                                                                    | The run took longer than `--timeout`; forge reports nothing until it finishes. |
 | `CONFIG_ERROR`, `INVALID_ARGUMENTS`, `FORGE_CRASHED`, `FORGE_FAILED`, `UNPARSEABLE_OUTPUT`, `INCONSISTENT_RESULT`, `OUTPUT_TOO_LARGE`, `FFI_OVERRIDE_FAILED` | forge could not produce a trustworthy report; the message and stderr say why.  |
 
+## Report a problem or suggest an improvement
+
+- Problem or wrong result: [open an issue](https://github.com/vschernoff/forge-test-mcp/issues/new/choose).
+  Include the version, your client, what was run and the output. Don't include keys, `.env`
+  contents, RPC URLs with API keys, or code you can't share.
+- Security problem: report it privately, see [SECURITY.md](SECURITY.md).
+- You can ask your coding agent to draft the report from your session. Read it before you post
+  it: nothing is sent unless you send it. This project collects no telemetry.
+
 ## Security and trust
 
 **Running tests runs code.** `forge test` executes the project's Solidity and cheatcodes with

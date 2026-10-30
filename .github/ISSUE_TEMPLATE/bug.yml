@@ -1,0 +1,89 @@
+name: Report a problem
+description: Something didn't work, or the result was wrong or misleading.
+labels: ['bug', 'needs-triage']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Please don't paste private keys, mnemonics, `.env` contents,
+        RPC URLs that contain an API key, or code you can't share publicly. The server redacts
+        some secret values from its results, but not every form, so check the output before you
+        paste it. Shorten local paths if they contain your name. Security problems: use a private
+        advisory instead (see SECURITY.md).
+  - type: input
+    id: version
+    attributes:
+      label: forge-test-mcp version
+      description: The version your client starts, e.g. 0.1.0 (from your MCP config, or `npm ls forge-test-mcp`).
+    validations:
+      required: true
+  - type: input
+    id: forge_version
+    attributes:
+      label: forge version
+      description: The first line of `forge --version`.
+      placeholder: 'forge Version: 1.8.6'
+    validations:
+      required: true
+  - type: input
+    id: client
+    attributes:
+      label: Client and version
+      description: e.g. Claude Code 2.1.x, Codex CLI, Cursor 2.x, Claude Desktop.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: OS and Node version
+      placeholder: macOS 15, Node 22.11
+  - type: textarea
+    id: call
+    attributes:
+      label: What was run
+      description: The tool and its arguments (e.g. `run_tests {"match_test":"test_transfer"}`), or what you asked the agent.
+    validations:
+      required: true
+  - type: input
+    id: result_code
+    attributes:
+      label: Result code shown, if any
+      description: The error code when the tests did not run, e.g. `COMPILE_FAILED`, `TIMEOUT`, `NO_TESTS_RAN`. Leave empty if the tests ran.
+  - type: dropdown
+    id: allow_ffi
+    attributes:
+      label: Was the server started with `--allow-ffi`?
+      options:
+        - 'No'
+        - 'Yes'
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Output
+      description: The tool result or error, trimmed to the relevant part.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected instead
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Smallest example (optional)
+      description: A short contract, test and `foundry.toml` that show it, if you can share them.
+  - type: dropdown
+    id: drafted_by
+    attributes:
+      label: Who wrote this report?
+      options:
+        - I wrote it
+        - An AI agent drafted it at my request, and I reviewed it before posting
+    validations:
+      required: true
