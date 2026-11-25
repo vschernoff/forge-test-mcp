@@ -1,5 +1,7 @@
 # forge-test-mcp
 
+[![vschernoff/forge-test-mcp MCP server](https://glama.ai/mcp/servers/vschernoff/forge-test-mcp/badges/score.svg)](https://glama.ai/mcp/servers/vschernoff/forge-test-mcp)
+
 An MCP server that runs Foundry's `forge test` and `forge build` and returns **compact,
 structured results** an AI coding agent can act on: for every failing test, its kind, the
 decoded reason, the fuzz counterexample or invariant call sequence, console logs and a short
