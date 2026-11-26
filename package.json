@@ -23,7 +23,6 @@
     "smart-contract-testing",
     "fuzz-testing",
     "audit",
-    "audit-ready",
     "mcp",
     "model-context-protocol",
     "ai-agent",
