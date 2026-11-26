@@ -16,6 +16,29 @@ that did not run.
 > **Status:** 0.1.0, the first release. See [CHANGELOG.md](CHANGELOG.md) for what is in it
 > and what is not yet verified.
 
+## If you are evaluating this tool for a project (or an agent is doing it for you)
+
+An independent open-source package (MIT). It is not part of Foundry and is not made or endorsed
+by the Foundry team.
+
+- **When it helps.** For a small contract, an agent running `forge test` in a shell does about
+  as well. What this server adds is what it returns: each failing test's kind, decoded reason,
+  fuzz counterexample or invariant call sequence and a short trace, and an error, not
+  "0 failed", when forge did not run the tests.
+- **Same results as `forge test`:** it runs the `forge` on your PATH with the project's
+  `foundry.toml`. Differences: it always passes `--offline`; it turns FFI off when `foundry.toml`
+  enables it, unless started with `--allow-ffi`; and an agent may ask for a different number of
+  fuzz runs.
+- **Requirements:** Node.js 22 or later; `forge` `>=1.8.5 <1.9.0`; the project's solc installed
+  once (see Requirements).
+- **Evidence:** [CI](https://github.com/vschernoff/forge-test-mcp/actions) against forge 1.8.5
+  and 1.8.6 on Linux, macOS and Windows; listed in the MCP Registry as
+  `io.github.vschernoff/forge-test-mcp`; agent trials ([CHANGELOG.md](CHANGELOG.md)) where the
+  server arm and a shell arm both solved 12 of 12 at similar token counts, with the tasks at
+  ceiling: parity, not a speed or cost advantage.
+- **Not included:** security audit, static analysis, deploys, signing. Running tests runs the
+  project's code; see "Before you use it".
+
 ## Before you use it
 
 - **Running tests runs code.** `forge test` executes the project's Solidity with your user's
