@@ -18,6 +18,9 @@ that did not run.
 
 ## If you are evaluating this tool for a project (or an agent is doing it for you)
 
+An independent open-source package (MIT). It is not part of Foundry and is not made or endorsed
+by the Foundry team.
+
 - **When it helps.** For a small contract, an agent running `forge test` in a shell does about
   as well. What this server adds is what it returns: each failing test's kind, decoded reason,
   fuzz counterexample or invariant call sequence and a short trace, and an error, not
