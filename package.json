@@ -2,7 +2,7 @@
   "name": "forge-test-mcp",
   "version": "0.1.0",
   "mcpName": "io.github.vschernoff/forge-test-mcp",
-  "description": "MCP server that runs Foundry builds and tests and returns compact, structured failures to any MCP client (Claude Code, Codex, Cursor, and others)",
+  "description": "Lets your AI coding agent test Solidity before an audit: runs the project's forge test and forge build and returns compact, structured failures. MCP server for Codex, Cursor, Claude Code and other MCP clients",
   "main": "src/index.js",
   "bin": {
     "forge-test-mcp": "src/index.js"
@@ -20,6 +20,10 @@
     "forge",
     "testing",
     "smart-contracts",
+    "smart-contract-testing",
+    "fuzz-testing",
+    "audit",
+    "audit-ready",
     "mcp",
     "model-context-protocol",
     "ai-agent",
